@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Solo en compilaciones de depuración: permite lanzar tareas desde adb para probarlas. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application android:networkSecurityConfig="@xml/network_security_config">
+        <!-- android.permission.DUMP: solo el shell de adb (y el sistema) pueden enviar la orden. -->
+        <receiver
+            android:name=".DebugReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP">
+            <intent-filter>
+                <action android:name="app.bloqueador.debug.RUN_UPDATE" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>

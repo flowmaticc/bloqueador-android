@@ -1,0 +1,12 @@
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.kotlin/
+captures/
+
+# Claves de firma: nunca al repositorio (en CI van como secretos cifrados)
+*.jks
+*.keystore
+keystore.properties
