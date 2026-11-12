@@ -47,7 +47,7 @@ class BloqueadorApp : Application() {
         AppUpdateWorker.schedule(this)
     }
 
-    /** El bloqueo visual (accesibilidad) se quitó en 0.2.0: borra sus reglas y miniaturas. */
+    /** Borra datos que dejaban versiones anteriores con bloqueo visual (reglas y miniaturas). */
     private fun removeVisualBlockLeftovers() {
         java.io.File(filesDir, "visual_rules.json").delete()
         java.io.File(cacheDir, "thumbs").deleteRecursively()

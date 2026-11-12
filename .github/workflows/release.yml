@@ -8,7 +8,6 @@
 # firmado y un update.json con versionCode, versionName y huella SHA-256.
 #
 # El versionCode es 2000 + número de ejecución de este flujo: siempre crece, en cualquier canal.
-# (Hasta la ejecución 6 fue 1000 + número; se subió para no chocar con compilaciones de prueba locales.)
 
 name: Publicar
 
@@ -50,7 +49,7 @@ jobs:
             tag="${GITHUB_REF#refs/tags/}"
             name="${tag#v}"
             if [[ "$name" == *-beta* || "$name" == *-rc* ]]; then channel=beta; else channel=stable; fi
-            # Si la versión ya está publicada (p. ej. al mover la etiqueta), no se vuelve a compilar ni publicar.
+            # Si esta versión ya está publicada, no se vuelve a compilar ni publicar.
             if gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
               echo "skip=true" >> "$GITHUB_OUTPUT"
               echo "La versión $tag ya está publicada: no se hace nada."

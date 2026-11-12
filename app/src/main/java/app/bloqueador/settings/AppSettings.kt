@@ -25,7 +25,7 @@ class AppSettings(context: Context) {
     private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
     init {
-        // 0.2.0: Anti-evasión DNS pasa a estar activada por defecto, también para quien ya tenía la app.
+        // Migración de ajustes v2: Anti-evasión DNS activada también en instalaciones existentes.
         if (prefs.getInt("settings_version", 1) < 2) {
             val edit = prefs.edit().putInt("settings_version", 2)
             if (prefs.contains("layers")) edit.putStringSet("layers", stringSet("layers") + ExtraLayers.DEFAULT_LAYER)
