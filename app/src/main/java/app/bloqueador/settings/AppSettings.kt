@@ -64,6 +64,27 @@ class AppSettings(context: Context) {
         get() = if (prefs.contains("layers")) stringSet("layers") else defaultLayers
         set(v) = prefs.edit().putStringSet("layers", v).apply()
 
+    /** Protección contra amenazas (phishing, malware, estafas). Activada por defecto. */
+    var threatProtection: Boolean
+        get() = prefs.getBoolean("threat_protection", true)
+        set(v) = prefs.edit().putBoolean("threat_protection", v).apply()
+
+    var threatLevel: app.bloqueador.lists.ThreatLevel
+        get() = app.bloqueador.lists.ThreatLevel.entries
+            .firstOrNull { it.name == prefs.getString("threat_level", null) }
+            ?: app.bloqueador.lists.ThreatLevel.STANDARD
+        set(v) = prefs.edit().putString("threat_level", v.name).apply()
+
+    /** Avisar con una notificación cuando se bloquea un sitio peligroso. */
+    var threatAlerts: Boolean
+        get() = prefs.getBoolean("threat_alerts", true)
+        set(v) = prefs.edit().putBoolean("threat_alerts", v).apply()
+
+    /** Si Android tiene a Garbillo como "VPN siempre activa" (lo comprueba el servicio al arrancar; null = no se sabe). */
+    var alwaysOnVpn: Boolean?
+        get() = if (prefs.contains("always_on_vpn")) prefs.getBoolean("always_on_vpn", false) else null
+        set(v) = prefs.edit().apply { if (v == null) remove("always_on_vpn") else putBoolean("always_on_vpn", v) }.apply()
+
     /** Cada cuánto se comprueban las listas en segundo plano. */
     var updateFrequency: UpdateFrequency
         get() = UpdateFrequency.entries.firstOrNull { it.name == prefs.getString("update_frequency", null) }

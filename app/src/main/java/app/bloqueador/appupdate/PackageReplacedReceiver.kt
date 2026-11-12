@@ -46,8 +46,8 @@ class PackageReplacedReceiver : BroadcastReceiver() {
             NotificationChannel(CHANNEL_ID, "Actualizaciones de la app", NotificationManager.IMPORTANCE_LOW)
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_shield)
-            .setContentTitle("Bloqueador actualizado a la versión ${BuildConfig.VERSION_NAME}")
+            .setSmallIcon(R.drawable.ic_stat_garbillo)
+            .setContentTitle("Garbillo actualizado a la versión ${BuildConfig.VERSION_NAME}")
             .setContentText("Todo sigue como estaba.")
             .setAutoCancel(true)
             .setContentIntent(

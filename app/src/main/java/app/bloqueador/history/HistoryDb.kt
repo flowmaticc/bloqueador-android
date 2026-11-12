@@ -36,7 +36,9 @@ data class HistoryEvent(
 data class DomainAt(val domain: String, val timestamp: Long)
 
 /** Qué entradas mostrar en la lista. */
-enum class HistoryFilter(val label: String) { BLOCKED("Bloqueadas"), ALLOWED("Permitidas"), ALL("Todas") }
+enum class HistoryFilter(val label: String) {
+    BLOCKED("Bloqueadas"), THREATS("Amenazas"), ALLOWED("Permitidas"), ALL("Todas")
+}
 
 @Dao
 interface HistoryDao {
@@ -49,7 +51,7 @@ interface HistoryDao {
         SELECT * FROM dns_events
         WHERE timestamp >= :since
           AND (:filter = 0 OR (:filter = 1 AND blocked = 1) OR (:filter = 2 AND blocked = 0)
-)
+               OR (:filter = 3 AND matchedRule LIKE 'amenaza:%'))
         ORDER BY timestamp DESC
         LIMIT :limit
         """
@@ -65,6 +67,10 @@ interface HistoryDao {
         """
     )
     suspend fun allowedAround(pkg: String?, from: Long, to: Long): List<DomainAt>
+
+    /** Amenazas bloqueadas desde [since] (para el resumen de Ajustes). */
+    @Query("SELECT COALESCE(SUM(count), 0) FROM dns_events WHERE timestamp >= :since AND matchedRule LIKE 'amenaza:%'")
+    suspend fun threatsSince(since: Long): Int
 
     @Query("DELETE FROM dns_events WHERE timestamp < :before")
     suspend fun deleteOlderThan(before: Long): Int

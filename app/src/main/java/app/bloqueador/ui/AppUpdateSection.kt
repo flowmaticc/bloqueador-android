@@ -70,7 +70,7 @@ fun AppUpdateSection() {
 
     fun install(info: UpdateInfo) {
         if (!updater.canInstall()) {
-            status = "Permite a Bloqueador instalar actualizaciones y vuelve a pulsar \"Instalar\"."
+            status = "Permite a Garbillo instalar actualizaciones y vuelve a pulsar \"Instalar\"."
             updater.openInstallPermissionSettings()
             return
         }

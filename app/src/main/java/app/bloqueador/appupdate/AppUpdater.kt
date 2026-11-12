@@ -132,7 +132,7 @@ class AppUpdater(private val context: Context, private val repo: String = BuildC
             connectTimeout = 15_000
             readTimeout = 30_000
             instanceFollowRedirects = true
-            setRequestProperty("User-Agent", "Bloqueador-Android")
+            setRequestProperty("User-Agent", "Garbillo-Android")
             setRequestProperty("Accept", "application/vnd.github+json, application/octet-stream")
         }
 

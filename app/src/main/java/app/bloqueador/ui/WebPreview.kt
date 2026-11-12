@@ -122,7 +122,7 @@ private fun SitePicker(event: HistoryEvent, onPick: (String) -> Unit) {
             style = MaterialTheme.typography.titleMedium,
         )
         Text(
-            "Bloqueador solo ve el nombre del dominio, no la página. Estas son las webs que " +
+            "Garbillo solo ve el nombre del dominio, no la página. Estas son las webs que " +
                 "${appLabel(context, event.appPackage)} abrió en esos momentos. Se cargará la que elijas " +
                 "dejando pasar solo ${event.domain}, y lo que cargue se rodeará en rojo.",
             style = MaterialTheme.typography.bodySmall,
@@ -326,7 +326,7 @@ private class PreviewClient(private val target: String, private val allowAll: Bo
             targetUrls.add(request.url.toString())
             return null
         }
-        if (!allowAll && BloqueadorApp.instance.engine.matcher.matchRule(host) != null) {
+        if (!allowAll && BloqueadorApp.instance.engine.peek(host) != null) {
             otherBlocked++
             return WebResourceResponse("text/plain", "utf-8", 403, "Bloqueado", emptyMap(), ByteArrayInputStream(ByteArray(0)))
         }

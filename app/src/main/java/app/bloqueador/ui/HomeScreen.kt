@@ -103,7 +103,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Bloqueador", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+            Text("Garbillo", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
             OutlinedButton(onClick = onOpenSettings) { Text("Ajustes") }
         }
 

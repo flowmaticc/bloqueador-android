@@ -47,10 +47,22 @@ Quien quiera el 100 % puede usar Estricto o añadir la capa GoodbyeAds.
 ## Prueba de carga larga (app auxiliar `loadtest`)
 
 Pequeña app aparte ("Prueba de carga", módulo `loadtest/`, no se publica) para dejar un móvil de
-pruebas solo durante horas. Cada 15 min despierta el móvil (también en Doze), resuelve 15 dominios
-normales y 15 de anuncios con el DNS del sistema —que pasa por Bloqueador— y descarga 3 webs reales.
-Cada ciclo añade una línea a su registro: batería, VPN activa, DNS correctos, anuncios bloqueados,
-webs descargadas, tiempos medios y errores. Si el filtro muere o se atasca, se ve en el registro.
+pruebas solo durante horas o días. Cada 20 min despierta el móvil (también en Doze) y, en un servicio
+en primer plano:
+
+1. Resuelve 15 dominios normales y 15 de anuncios con el DNS del sistema —que pasa por el filtro— y
+   anota batería, VPN activa, aciertos y tiempos en `files/log.csv`.
+2. Abre 5 webs reales de una lista variada (`Sites.kt`: medios, deportes, tecnología, recetas, tiempo,
+   ocio, compras, herramientas e internacionales) en un navegador interno, acepta el aviso de cookies
+   como haría la mayoría de la gente (`--ez cookies false` para no hacerlo) y baja por la página.
+   Anota en `files/webs.csv` el tiempo, el número de peticiones y todos los dominios que pidió cada web.
+
+### Registro interno (solo compilaciones de depuración)
+
+Las compilaciones de depuración de la app guardan cada consulta en
+`files/debug/consultas-AAAA-MM-DD.csv` (app, dominio, decisión, regla, tiempo de respuesta del DNS
+real) y estadísticas cada 5 minutos. En la versión publicada ese código no existe: el compilador lo
+elimina. Cruzando ese registro con `webs.csv` se ve, web a web, qué se bloqueó y qué pasó.
 
 ```bash
 ./gradlew :loadtest:assembleDebug

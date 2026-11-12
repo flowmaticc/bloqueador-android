@@ -46,11 +46,16 @@ class HistoryRepository(private val context: Context, private val settings: AppS
         return SiteGuess.candidates(event.domain, event.timestamp, around.map { it.domain to it.timestamp })
     }
 
+    /** Amenazas bloqueadas dentro del periodo que se conserva el historial. */
+    suspend fun threatsBlocked(): Int =
+        dao.threatsSince(System.currentTimeMillis() - settings.historyRetention.millis)
+
     fun observe(filter: HistoryFilter): Flow<List<HistoryEvent>> {
         val code = when (filter) {
             HistoryFilter.ALL -> 0
             HistoryFilter.BLOCKED -> 1
             HistoryFilter.ALLOWED -> 2
+            HistoryFilter.THREATS -> 3
         }
         return dao.observe(System.currentTimeMillis() - settings.historyRetention.millis, code, MAX_ROWS)
     }
@@ -108,10 +113,13 @@ object RuleOrigin {
     suspend fun find(rule: String, settings: AppSettings, repository: BlocklistRepository, context: Context): List<String> =
         withContext(Dispatchers.IO) {
             val origins = mutableListOf<String>()
+            val threat = app.bloqueador.filter.FilterEngine.isThreat(rule)
+            val rule = app.bloqueador.filter.FilterEngine.plainRule(rule)
             val domain = rule.removePrefix("||").removeSuffix("^")
             if (rule.startsWith("||") && domain in settings.blockedDomains) origins += "Tus bloqueos propios"
             if (domain == "use-application-dns.net") origins += "Regla interna (desactiva el DNS cifrado de Firefox)"
-            for (source in repository.activeSources()) {
+            val sources = if (threat) listOfNotNull(repository.threatSource()) else repository.activeSources()
+            for (source in sources) {
                 val file = java.io.File(context.filesDir, "lists/${source.id}.txt")
                 if (!file.isFile) continue
                 val found = file.bufferedReader().useLines { lines ->

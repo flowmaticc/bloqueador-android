@@ -41,6 +41,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.bloqueador.BloqueadorApp
+import app.bloqueador.filter.FilterEngine
 import app.bloqueador.history.AppResolver
 import app.bloqueador.history.HistoryEvent
 import app.bloqueador.history.HistoryFilter
@@ -52,11 +53,11 @@ import java.util.concurrent.ConcurrentHashMap
 
 /** Historial de consultas: solo se lee cuando el usuario lo abre. */
 @Composable
-fun HistoryScreen(onBack: () -> Unit) {
+fun HistoryScreen(onBack: () -> Unit, startWithThreats: Boolean = false) {
     val context = LocalContext.current
     val app = BloqueadorApp.instance
 
-    var filter by rememberSaveable { mutableStateOf(HistoryFilter.BLOCKED) }
+    var filter by rememberSaveable { mutableStateOf(if (startWithThreats) HistoryFilter.THREATS else HistoryFilter.BLOCKED) }
     var query by rememberSaveable { mutableStateOf("") }
     var appFilter by rememberSaveable { mutableStateOf<String?>(null) }
     var selected by remember { mutableStateOf<HistoryEvent?>(null) }
@@ -220,6 +221,14 @@ private fun HistoryDetailDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Detail("Resultado", statusLabel(event))
+                if (FilterEngine.isThreat(event.matchedRule)) {
+                    Text(
+                        "Está en la lista de amenazas (phishing, malware o estafas). Solo permítelo si estás " +
+                            "seguro de que es de confianza.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
                 Detail("App", appLabel(context, event.appPackage) + (event.appPackage?.let { "\n$it" } ?: ""))
                 Detail(
                     "Hora",
@@ -227,7 +236,7 @@ private fun HistoryDetailDialog(
                         if (event.count > 1) " (${event.count} consultas)" else "",
                 )
                 if (event.matchedRule != null) {
-                    Detail("Regla", event.matchedRule)
+                    Detail("Regla", FilterEngine.plainRule(event.matchedRule))
                     Detail(
                         "Lista",
                         when {
@@ -280,7 +289,11 @@ private fun Detail(label: String, value: String) {
     }
 }
 
-private fun statusLabel(e: HistoryEvent): String = if (e.blocked) "Bloqueada" else "Permitida"
+private fun statusLabel(e: HistoryEvent): String = when {
+    FilterEngine.isThreat(e.matchedRule) -> "Peligro"
+    e.blocked -> "Bloqueada"
+    else -> "Permitida"
+}
 
 private val labelCache = ConcurrentHashMap<String, String>()
 

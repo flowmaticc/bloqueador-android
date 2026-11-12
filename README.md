@@ -1,7 +1,9 @@
-# Bloqueador
+# Garbillo
 
-Bloqueador de publicidad y rastreadores para **Android**, en todo el móvil (navegador, apps y juegos),
-**sin root**, sin cuentas y sin enviar datos a ningún servidor.
+Bloqueador de publicidad, rastreadores y **sitios peligrosos** para **Android**, en todo el móvil
+(navegador, apps y juegos), **sin root**, sin cuentas y sin enviar datos a ningún servidor.
+
+*Garbillo: la criba de esparto con la que se limpiaba el grano. Deja pasar lo bueno y retiene lo demás.*
 
 🌐 **Web:** [flowmaticc.github.io/utilities/bloqueador-android](https://flowmaticc.github.io/utilities/bloqueador-android/)
 · 📥 **Descarga:** [última versión estable](https://github.com/flowmaticc/bloqueador-android/releases/latest)
@@ -17,11 +19,15 @@ nombres de dominio, nunca el contenido.
 - Tres niveles: **Ligero** (Hagezi Light), **Equilibrado** (Hagezi Pro, por defecto) y **Estricto**
   (Hagezi Pro++), más capas opcionales: anti-evasión DNS, lista del fabricante del móvil, juegos y
   apps gratis (GoodbyeAds), 1Hosts, AdAway y StevenBlack.
+- **Protección contra amenazas** (activada de serie): phishing, malware, estafas y webs falsas con
+  las listas *Threat Intelligence Feeds* de Hagezi, con aviso cuando se bloquea un sitio peligroso.
 - Elige qué apps se filtran; las de banca y pagos se excluyen por defecto.
 - **Historial local** (1 a 24 h) con la app que hizo cada consulta, y **"Ver en la web"**: carga la web
   donde apareció un dominio y rodea en rojo lo que pone en ella.
 - Listas actualizadas automáticamente (solo si cambian) y consumo mínimo de batería.
 - Se actualiza sola desde GitHub Releases, con canal **Estable** (por defecto), **Beta** o **Nightly**.
+
+Si la red devuelve respuestas DNS demasiado grandes para UDP, Garbillo las pide completas por TCP.
 
 Lo que **no** puede quitar ningún bloqueador de este tipo: los anuncios de YouTube y Twitch y las
 publicaciones promocionadas de las redes sociales (llegan por los mismos servidores que el contenido).

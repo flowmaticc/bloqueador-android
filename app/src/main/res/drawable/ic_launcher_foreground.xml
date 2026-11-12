@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Garbillo: criba redonda con su aro y la malla. Zona segura del icono adaptativo: círculo de 66 dp. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Malla, recortada al interior del aro -->
+    <group>
+        <clip-path android:pathData="M54,32a22,22 0 1,1 0,44a22,22 0 1,1 0,-44z" />
+        <path
+            android:strokeColor="#CAFF33"
+            android:strokeWidth="1.6"
+            android:strokeAlpha="0.75"
+            android:pathData="M40,22L40,86 M49,22L49,86 M58,22L58,86 M67,22L67,86
+                M22,40L86,40 M22,49L86,49 M22,58L86,58 M22,67L86,67" />
+    </group>
+
+    <!-- Aro de madera de la criba -->
+    <path
+        android:strokeColor="#CAFF33"
+        android:strokeWidth="6"
+        android:fillColor="#00000000"
+        android:pathData="M54,29a25,25 0 1,1 0,50a25,25 0 1,1 0,-50z" />
+
+    <!-- El "grano" que no pasa: lo que se queda en la criba -->
+    <path
+        android:fillColor="#CAFF33"
+        android:pathData="M59.5,50.5h7v7h-7z" />
+</vector>

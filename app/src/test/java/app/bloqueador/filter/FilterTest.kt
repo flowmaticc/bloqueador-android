@@ -77,14 +77,38 @@ class FilterTest {
     @Test
     fun `el motor usa caché y se puede sustituir en caliente`() {
         val engine = FilterEngine(cacheSize = 2)
-        engine.update(matcher)
+        engine.update(FilterEngine.Filters(matcher))
         assertTrue(engine.isBlocked("ads.example.com"))
         assertTrue(engine.isBlocked("ads.example.com"))
         assertEquals(1, engine.cacheHits.get())
         assertEquals(2, engine.blocked.get())
 
-        engine.update(DomainMatcher.EMPTY)
+        engine.update(FilterEngine.Filters(DomainMatcher.EMPTY))
         assertFalse(engine.isBlocked("ads.example.com")) // la caché se vació al actualizar
+    }
+
+    @Test
+    fun `las amenazas se marcan, cuentan aparte y las excepciones del usuario las permiten`() {
+        val threats = BlocklistParser.parse(sequenceOf("||phishing-banco.example^", "@@||falso-positivo.example^", "||falso-positivo.example^")).build()
+        val engine = FilterEngine()
+        engine.update(FilterEngine.Filters(matcher, threats))
+
+        val rule = engine.decide("login.phishing-banco.example")
+        assertTrue(FilterEngine.isThreat(rule))
+        assertEquals("||phishing-banco.example^", FilterEngine.plainRule(rule!!))
+        assertEquals(1, engine.threatsBlocked.get())
+
+        // Un bloqueo de publicidad normal no es una amenaza.
+        val ad = engine.decide("ads.example.com")
+        assertFalse(FilterEngine.isThreat(ad))
+        assertEquals(1, engine.threatsBlocked.get())
+
+        // La excepción (de la lista o del usuario) tiene prioridad.
+        assertNull(engine.decide("falso-positivo.example"))
+
+        // peek() decide igual pero sin contar.
+        assertTrue(FilterEngine.isThreat(engine.peek("phishing-banco.example")))
+        assertEquals(3, engine.queries.get())
     }
 
     @Test

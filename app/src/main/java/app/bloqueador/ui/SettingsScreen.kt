@@ -44,6 +44,7 @@ import app.bloqueador.apps.AppStrategy
 import app.bloqueador.apps.InstalledApps
 import app.bloqueador.lists.BlockMode
 import app.bloqueador.lists.ExtraLayers
+import app.bloqueador.lists.ThreatLevel
 import app.bloqueador.settings.AppSettings
 import app.bloqueador.settings.HistoryRetention
 import app.bloqueador.settings.UpdateFrequency
@@ -60,12 +61,13 @@ import java.text.Normalizer
  */
 enum class SettingsSection(val title: String, val group: String) {
     MODE("Nivel de bloqueo", "Protección"),
+    SECURITY("Protección contra amenazas", "Protección"),
     LAYERS("Listas adicionales", "Protección"),
     APPS("Apps protegidas", "Protección"),
     RULES("Mis excepciones y bloqueos", "Protección"),
     LIST_UPDATES("Actualización de listas", "Funcionamiento"),
     HISTORY("Historial", "Funcionamiento"),
-    BATTERY("Batería", "Funcionamiento"),
+    BATTERY("Batería y arranque", "Funcionamiento"),
     APP_UPDATES("Actualizaciones de la app", "Aplicación"),
     HELP("Qué puede y qué no puede bloquear", "Aplicación"),
     ABOUT("Acerca de", "Aplicación"),
@@ -77,6 +79,8 @@ data class SettingEntry(val section: SettingsSection, val title: String, val key
 /** Índice del buscador. Al añadir un ajuste nuevo, añadirlo aquí también. */
 fun settingsIndex(manufacturer: String?): List<SettingEntry> = buildList {
     add(SettingEntry(SettingsSection.MODE, "Nivel de bloqueo", "modo ligero equilibrado estricto agresividad hagezi pro lista base"))
+    add(SettingEntry(SettingsSection.SECURITY, "Protección contra amenazas", "seguridad phishing malware virus estafas fraude timo webs falsas criptominado peligroso ciberseguridad"))
+    add(SettingEntry(SettingsSection.SECURITY, "Avisos de sitios peligrosos", "notificacion alerta amenaza bloqueada"))
     add(SettingEntry(SettingsSection.LAYERS, "Listas adicionales", "capas extra mas bloqueo"))
     ExtraLayers.available(manufacturer).forEach {
         add(SettingEntry(SettingsSection.LAYERS, it.label, it.description + " " + it.id))
@@ -91,6 +95,8 @@ fun settingsIndex(manufacturer: String?): List<SettingEntry> = buildList {
     add(SettingEntry(SettingsSection.HISTORY, "Tiempo que se conserva el historial", "conservar retencion 1 3 6 24 horas"))
     add(SettingEntry(SettingsSection.HISTORY, "Borrar historial", "eliminar limpiar"))
     add(SettingEntry(SettingsSection.BATTERY, "Que Android no cierre el filtro", "bateria ahorro optimizacion sin restricciones se apaga"))
+    add(SettingEntry(SettingsSection.BATTERY, "VPN siempre activa", "arranque inicio encender reiniciar automatico bloquear conexiones sin vpn"))
+    add(SettingEntry(SettingsSection.ABOUT, "Web y política de privacidad", "pagina privacidad datos permisos ayuda"))
     add(SettingEntry(SettingsSection.APP_UPDATES, "Canal de actualizaciones", "estable beta nightly version actualizar app instalar"))
     add(SettingEntry(SettingsSection.HELP, "Qué no puede bloquear", "youtube twitch instagram tiktok x twitter spotify redes sociales hueco brave firefox ublock"))
     add(SettingEntry(SettingsSection.ABOUT, "Acerca de", "version licencia codigo fuente github privacidad"))
@@ -200,6 +206,8 @@ private fun sectionSummary(s: SettingsSection, settings: AppSettings): String {
     val app = BloqueadorApp.instance
     return when (s) {
         SettingsSection.MODE -> "${settings.mode.label} · ${settings.mode.source.label}"
+        SettingsSection.SECURITY ->
+            if (settings.threatProtection) "Activada · nivel ${settings.threatLevel.label}" else "Desactivada"
         SettingsSection.LAYERS -> {
             val on = ExtraLayers.available(android.os.Build.MANUFACTURER).filter { it.id in settings.layers }
             if (on.isEmpty()) "Ninguna" else on.joinToString { it.label }
@@ -209,7 +217,7 @@ private fun sectionSummary(s: SettingsSection, settings: AppSettings): String {
         SettingsSection.LIST_UPDATES -> settings.updateFrequency.label +
             (app.repository.lastUpdated.takeIf { it > 0 }?.let { " · actualizadas " + relativeTime(it) } ?: "")
         SettingsSection.HISTORY -> if (settings.historyEnabled) "Activado · ${settings.historyRetention.label}" else "Desactivado"
-        SettingsSection.BATTERY -> "Ahorro de batería y filtro siempre activo"
+        SettingsSection.BATTERY -> "Ahorro de batería y VPN siempre activa"
         SettingsSection.APP_UPDATES -> "${settings.updateChannel.label} · versión ${BuildConfig.VERSION_NAME}"
         SettingsSection.HELP -> "YouTube, redes sociales, huecos en webs…"
         SettingsSection.ABOUT -> "Versión, licencia y código fuente"
@@ -268,6 +276,7 @@ private fun SectionScreen(
 
         when (section) {
             SettingsSection.MODE -> ModeSection { applyLists(download = true) }
+            SettingsSection.SECURITY -> SecuritySection { applyLists(download = true) }
             SettingsSection.LAYERS -> LayersSection { on -> applyLists(download = on) }
             SettingsSection.APPS -> AppsSection(onChangeStrategy, onEditApps)
             SettingsSection.RULES -> RulesSection { applyLists(download = false) }
@@ -300,6 +309,85 @@ private fun ModeSection(onChanged: () -> Unit) {
                 },
             )
         }
+    }
+}
+
+@Composable
+private fun SecuritySection(onChanged: () -> Unit) {
+    val app = BloqueadorApp.instance
+    val settings = app.settings
+    var enabled by remember { mutableStateOf(settings.threatProtection) }
+    var level by remember { mutableStateOf(settings.threatLevel) }
+    var alerts by remember { mutableStateOf(settings.threatAlerts) }
+    val blockedRecently by androidx.compose.runtime.produceState<Int?>(null) { value = app.history.threatsBlocked() }
+
+    SectionCard("Qué hace") {
+        Text(
+            "Bloquea dominios conocidos de phishing (webs que imitan a tu banco, a Correos o a una tienda " +
+                "para robarte datos), malware, estafas, webs falsas y criptominado. Funciona en todas las " +
+                "apps: navegador, correo, mensajería, SMS con enlaces…",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        SwitchRow(
+            title = "Protección contra amenazas",
+            description = "Recomendado: déjala activada.",
+            checked = enabled,
+        ) { on ->
+            enabled = on
+            settings.threatProtection = on
+            onChanged()
+        }
+        if (enabled) {
+            blockedRecently?.let { n ->
+                Text(
+                    if (n == 0) "No se ha bloqueado ninguna amenaza en las últimas ${settings.historyRetention.label}."
+                    else "Amenazas bloqueadas en las últimas ${settings.historyRetention.label}: $n. Las ves en Historial → Amenazas.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+    }
+    if (enabled) {
+        SectionCard("Nivel") {
+            ThreatLevel.entries.forEach { l ->
+                RadioRow(
+                    selected = l == level,
+                    title = l.label + if (l == ThreatLevel.STANDARD) " (recomendado)" else "",
+                    description = l.description,
+                ) {
+                    if (l != level) {
+                        level = l
+                        settings.threatLevel = l
+                        onChanged()
+                    }
+                }
+            }
+        }
+        SectionCard("Avisos") {
+            SwitchRow(
+                title = "Avisar cuando se bloquee un sitio peligroso",
+                description = "Un bloqueo es silencioso: la web simplemente no carga. El aviso te dice qué se " +
+                    "bloqueó y qué app lo pidió. Como mucho un aviso por minuto.",
+                checked = alerts,
+            ) { on ->
+                alerts = on
+                settings.threatAlerts = on
+            }
+        }
+    }
+    SectionCard("De dónde salen los datos") {
+        Text(
+            "Listas públicas \"Threat Intelligence Feeds\" de Hagezi, que reúnen decenas de fuentes de " +
+                "seguridad y se actualizan varias veces al día. La app las descarga directamente de GitHub y " +
+                "las comprueba en el móvil: no envía a nadie las webs que visitas. Las listas de webs falsas y " +
+                "de ventanas emergentes maliciosas ya van incluidas en el nivel de bloqueo Equilibrado.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Text(
+            "Ninguna lista es perfecta: una web de phishing recién creada puede tardar unas horas en aparecer. " +
+                "Desconfía igualmente de enlaces que te piden datos o pagos con prisa.",
+            style = MaterialTheme.typography.bodySmall,
+        )
     }
 }
 
@@ -495,16 +583,38 @@ private fun BatterySection() {
     SectionCard("Que Android no cierre el filtro") {
         Text(
             if (optimized) {
-                "Ahora mismo Android puede cerrar Bloqueador para ahorrar batería. Bloqueador apenas gasta " +
+                "Ahora mismo Android puede cerrar Garbillo para ahorrar batería. Garbillo apenas gasta " +
                     "(está dormido hasta que llega una consulta), así que es seguro excluirlo: busca " +
-                    "Bloqueador y elige \"No optimizar\" o \"Sin restricciones\"."
+                    "Garbillo y elige \"No optimizar\" o \"Sin restricciones\"."
             } else {
-                "Bloqueador ya está excluido del ahorro de batería. El filtro seguirá activo aunque no uses el móvil."
+                "Garbillo ya está excluido del ahorro de batería. El filtro seguirá activo aunque no uses el móvil."
             },
             style = MaterialTheme.typography.bodyMedium,
         )
         BatteryGuide.manufacturerSteps()?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         OutlinedButton(onClick = { BatteryGuide.openSettings(context) }) { Text("Abrir ajustes de batería") }
+    }
+    val alwaysOn = BloqueadorApp.instance.settings.alwaysOnVpn
+    SectionCard("VPN siempre activa (recomendado)") {
+        Text(
+            when (alwaysOn) {
+                true -> "Activada: Android arranca el filtro solo al encender el móvil y lo vuelve a abrir si se cierra."
+                false -> "Sin activar. Con ella, Android arranca el filtro solo al encender el móvil y lo vuelve a " +
+                    "abrir si algo lo cierra."
+                null -> "Con ella, Android arranca el filtro solo al encender el móvil y lo vuelve a abrir si algo lo cierra."
+            },
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Text(
+            "En Ajustes de Android → Red → VPN, toca el engranaje junto a Garbillo y activa \"VPN siempre activa\". " +
+                "No actives \"Bloquear conexiones sin VPN\": si el filtro se reinicia, te quedarías sin internet unos segundos.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        OutlinedButton(onClick = {
+            runCatching {
+                context.startActivity(android.content.Intent(android.provider.Settings.ACTION_VPN_SETTINGS))
+            }
+        }) { Text("Abrir ajustes de VPN") }
     }
     SectionCard("Consumo medido") {
         Text(
@@ -532,19 +642,23 @@ private fun HelpSection() {
 @Composable
 private fun AboutSection() {
     val uri = LocalUriHandler.current
-    SectionCard("Bloqueador") {
+    SectionCard("Garbillo") {
         Text("Versión ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
         Text(
-            "Bloqueador de publicidad y rastreadores para todo el móvil, sin root. Funciona dentro del " +
+            "Garbillo es un bloqueador de publicidad y rastreadores para todo el móvil, sin root. Funciona dentro del " +
                 "móvil: no envía tus datos a ningún servidor y no recoge estadísticas.",
             style = MaterialTheme.typography.bodySmall,
         )
         Text("Software libre, licencia GPLv3. Listas de bloqueo de Hagezi y otros autores.", style = MaterialTheme.typography.bodySmall)
+        OutlinedButton(onClick = { uri.openUri(WEB_URL) }) { Text("Web de Garbillo") }
+        OutlinedButton(onClick = { uri.openUri("${WEB_URL}privacidad/") }) { Text("Política de privacidad") }
         OutlinedButton(onClick = { uri.openUri("https://github.com/${BuildConfig.UPDATE_REPO}") }) {
             Text("Código fuente en GitHub")
         }
     }
 }
+
+private const val WEB_URL = "https://flowmaticc.github.io/utilities/bloqueador-android/"
 
 /** Fila con título, descripción e interruptor; toda la fila cambia el interruptor. */
 @Composable
