@@ -35,7 +35,7 @@ enum class BlockMode(val label: String, val description: String, val source: Lis
         ListSource("light", "Hagezi Light", "", "$HAGEZI/light.txt"),
     ),
     BALANCED(
-        "Equilibrado", "Recomendado para el día a día: configurar y olvidar.",
+        "Equilibrado", "Para el día a día: configurar y olvidar. Bloquea bien sin romper nada habitual.",
         ListSource("pro", "Hagezi Pro", "", "$HAGEZI/pro.txt"),
     ),
     STRICT(
