@@ -28,6 +28,9 @@ import app.bloqueador.apps.computeTunnelApps
 import app.bloqueador.dns.DnsMessage
 import app.bloqueador.dns.IpPacket
 import app.bloqueador.dns.UdpPacket
+import app.bloqueador.BuildConfig
+import app.bloqueador.debug.QueryLog
+import app.bloqueador.filter.FilterEngine
 import app.bloqueador.ui.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -72,6 +75,7 @@ class DnsVpnService : VpnService() {
     private var forwarder: DnsForwarder? = null
     private var recorder: HistoryRecorder? = null
     private var appResolver: AppResolver? = null
+    private var threatAlerts: ThreatAlerts? = null
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -114,13 +118,29 @@ class DnsVpnService : VpnService() {
         app.engine.resetCounters()
         val up = UpstreamDns(this).also { it.start() }
         upstream = up
-        forwarder = DnsForwarder(protect = { protect(it) }, upstream = { up.current() }, reply = ::write)
-            .also { it.start() }
+        forwarder = DnsForwarder(
+            protect = { protect(it) },
+            protectTcp = { protect(it) },
+            upstream = { up.current() },
+            reply = ::write,
+        ).also { it.start() }
+        if (BuildConfig.DEBUG) {
+            QueryLog.init(this)
+            scope.launch {
+                while (true) {
+                    kotlinx.coroutines.delay(5 * 60_000L)
+                    val e = app.engine
+                    QueryLog.stats(e.queries.get(), e.blocked.get(), e.threatsBlocked.get(), e.cacheHits.get(), forwarder?.inFlight ?: 0)
+                }
+            }
+        }
         appResolver = AppResolver(this)
+        threatAlerts = ThreatAlerts(this)
         val history = app.history
         recorder = HistoryRecorder(scope) { history.write(it) }
 
         val opened = openTunnel()
+        if (Build.VERSION.SDK_INT >= 29) app.settings.alwaysOnVpn = isAlwaysOn
         if (opened == null) {
             // null = la app no tiene permiso VPN (p. ej. otra VPN lo tiene ahora).
             app.setVpnState(VpnState.Error("No se pudo activar la VPN. ¿Hay otra VPN activa?"))
@@ -260,18 +280,23 @@ class DnsVpnService : VpnService() {
         val question = DnsMessage.parseQuery(udp.data, udp.payloadOffset, udp.payloadLength) ?: return
 
         val rule = app.engine.decide(question.name)
+        if (BuildConfig.DEBUG) QueryLog.query(ownerOf(udp), question.name, rule)
         if (rule != null) {
             // Se averigua la app antes de responder: tras la respuesta el socket puede cerrarse.
             record(udp, question.name, rule)
+            if (FilterEngine.isThreat(rule)) threatAlerts?.onThreat(question.name, ownerOf(udp))
             val response = DnsMessage.buildBlockedResponse(udp.data, question, udp.payloadOffset)
             write(IpPacket.buildUdpReply(udp, response))
         } else {
             // Copia independiente del búfer de lectura, que se reutiliza en el siguiente read().
             val request = IpPacket.parseUdp(buffer.copyOf(length), length) ?: return
             record(request, question.name, null)
-            forwarder?.forward(request)
+            forwarder?.forward(request, question.name)
         }
     }
+
+    private fun ownerOf(udp: UdpPacket): String? =
+        appResolver?.ownerPackage(udp.source, udp.sourcePort, udp.destination, udp.destinationPort)
 
     /** Anota la consulta en el historial (si está activado), con la app que la hizo. */
     private fun record(udp: UdpPacket, domain: String, rule: String?) {
@@ -307,8 +332,10 @@ class DnsVpnService : VpnService() {
         upstream = null
         // Guarda lo pendiente del historial antes de que se cancele el scope del servicio.
         recorder?.let { rec -> runBlocking { withTimeoutOrNull(2000) { rec.flush() } } }
+        if (BuildConfig.DEBUG) QueryLog.flushNow()
         recorder = null
         appResolver = null
+        threatAlerts = null
     }
 
     private fun closeTunnel(t: Tunnel) {
@@ -327,7 +354,7 @@ class DnsVpnService : VpnService() {
                 .apply { setShowBadge(false) }
         )
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_shield)
+            .setSmallIcon(R.drawable.ic_stat_garbillo)
             .setContentTitle(getString(R.string.notif_running))
             .setContentText(getString(R.string.notif_running_text))
             .setOngoing(true)

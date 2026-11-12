@@ -32,7 +32,7 @@ class HistoryTest {
     @Test
     fun `el motor cachea también la regla`() {
         val engine = FilterEngine()
-        engine.update(matcher)
+        engine.update(FilterEngine.Filters(matcher))
         assertEquals("||ads.com^", engine.decide("a.ads.com"))
         assertEquals("||ads.com^", engine.decide("a.ads.com"))
         assertNull(engine.decide("libre.org"))

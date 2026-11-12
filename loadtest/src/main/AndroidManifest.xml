@@ -4,6 +4,8 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application android:label="Prueba de carga" android:allowBackup="false">
         <activity android:name=".MainActivity" android:exported="true">
@@ -13,6 +15,10 @@
             </intent-filter>
         </activity>
         <receiver android:name=".CycleReceiver" android:exported="false" />
+        <service
+            android:name=".BrowseService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
         <receiver android:name=".BootReceiver" android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />

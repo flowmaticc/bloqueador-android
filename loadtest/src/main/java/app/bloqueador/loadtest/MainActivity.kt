@@ -11,8 +11,8 @@ import app.bloqueador.loadtest.LoadTest.intervalMinutes
 
 /**
  * Pantalla mínima: iniciar/parar y ver las últimas líneas del registro.
- * Por adb: `am start -n app.bloqueador.loadtest/.MainActivity --es accion iniciar --ei minutos 15`
- * (o `--es accion parar`).
+ * Por adb: `am start -n app.bloqueador.loadtest/.MainActivity --es accion iniciar --ei minutos 20`
+ * (o `--es accion parar`). Con `--ez cookies false` no acepta los avisos de cookies al navegar.
  */
 class MainActivity : Activity() {
 
@@ -20,6 +20,9 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (intent.hasExtra("cookies")) {
+            with(LoadTest) { acceptCookies = intent.getBooleanExtra("cookies", true) }
+        }
         when (intent.getStringExtra("accion")) {
             "iniciar" -> LoadTest.start(this, intent.getIntExtra("minutos", LoadTest.DEFAULT_MINUTES))
             "parar" -> LoadTest.stop(this)

@@ -71,8 +71,8 @@ class AppUpdateWorker(context: Context, params: WorkerParameters) : CoroutineWor
             )
             val open = Intent(context, MainActivity::class.java).putExtra(EXTRA_OPEN_UPDATES, true)
             val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_shield)
-                .setContentTitle("Nueva versión de Bloqueador: ${info.versionName}")
+                .setSmallIcon(R.drawable.ic_stat_garbillo)
+                .setContentTitle("Nueva versión de Garbillo: ${info.versionName}")
                 .setContentText("Toca para ver los cambios e instalarla.")
                 .setAutoCancel(true)
                 .setContentIntent(

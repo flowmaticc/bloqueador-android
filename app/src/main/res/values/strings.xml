@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Bloqueador</string>
+    <string name="app_name">Garbillo</string>
     <string name="notif_channel">Estado del filtro</string>
     <string name="notif_running">Filtro DNS activo</string>
     <string name="notif_running_text">Bloqueando publicidad y rastreadores</string>

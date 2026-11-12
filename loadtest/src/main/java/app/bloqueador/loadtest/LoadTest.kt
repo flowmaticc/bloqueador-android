@@ -32,7 +32,7 @@ import java.util.Locale
 object LoadTest {
 
     private const val PREFS = "loadtest"
-    const val DEFAULT_MINUTES = 15
+    const val DEFAULT_MINUTES = 20
 
     /** Dominios corrientes: deben resolverse siempre. */
     private val NORMAL = listOf(
@@ -49,20 +49,17 @@ object LoadTest {
         "ads.yahoo.com", "adcolony.com", "cdn.mouseflow.com", "luckyorange.com",
     )
 
-    /** Webs reales con publicidad; se descargan unas pocas por ciclo, rotando. */
-    private val WEBS = listOf(
-        "https://www.wikipedia.org/", "https://www.eldiario.es/", "https://www.marca.com/",
-        "https://www.bbc.com/", "https://www.20minutos.es/", "https://github.com/",
-        "https://as.com/", "https://www.xataka.com/",
-    )
-    private const val WEBS_PER_CYCLE = 3
-
     fun prefs(ctx: Context) = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
     fun logFile(ctx: Context) = File(ctx.filesDir, "log.csv")
 
     var Context.enabled: Boolean
         get() = prefs(this).getBoolean("enabled", false)
         set(v) = prefs(this).edit().putBoolean("enabled", v).apply()
+
+    /** Aceptar los avisos de cookies al navegar (como haría la mayoría de la gente). */
+    var Context.acceptCookies: Boolean
+        get() = prefs(this).getBoolean("accept_cookies", true)
+        set(v) = prefs(this).edit().putBoolean("accept_cookies", v).apply()
 
     var Context.intervalMinutes: Int
         get() = prefs(this).getInt("minutes", DEFAULT_MINUTES)
@@ -129,64 +126,23 @@ object LoadTest {
             dnsMs += SystemClock.elapsedRealtime() - t
         }
 
-        val cycle = prefs(ctx).getInt("cycle", 0)
-        prefs(ctx).edit().putInt("cycle", cycle + 1).apply()
-        val webs = (0 until WEBS_PER_CYCLE).map { WEBS[(cycle * WEBS_PER_CYCLE + it) % WEBS.size] }
-        var webOk = 0
-        var webMs = 0L
-        for (u in webs) {
-            val t = SystemClock.elapsedRealtime()
-            try {
-                val c = URL(u).openConnection() as HttpURLConnection
-                c.connectTimeout = 8_000
-                c.readTimeout = 8_000
-                c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36")
-                val code = c.responseCode
-                (if (code < 400) c.inputStream else c.errorStream)?.use { s ->
-                    val buf = ByteArray(16 * 1024)
-                    var total = 0
-                    while (total < 512 * 1024) { val n = s.read(buf); if (n < 0) break; total += n }
-                }
-                c.disconnect()
-                if (code < 400) webOk++ else errors += "http$code:${URL(u).host}"
-            } catch (e: Exception) {
-                errors += "web:${URL(u).host}:${e.javaClass.simpleName}"
-            }
-            webMs += SystemClock.elapsedRealtime() - t
-        }
-
         val time = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
         val n = NORMAL.size + ADS.size
         logFile(ctx).appendText(
             listOf(
                 time, battery, if (vpn) 1 else 0, dnsOk, NORMAL.size, adsBlocked, ADS.size,
-                webOk, webs.size, dnsMs / n, webMs / webs.size, errors.joinToString(" ").replace(',', ';'),
+                0, 0, dnsMs / n, 0, errors.joinToString(" ").replace(',', ';'),
             ).joinToString(",") + "\n",
         )
     }
 }
 
-/** Salta con la alarma: mantiene el móvil despierto, ejecuta un ciclo y programa el siguiente. */
+/** Salta con la alarma y arranca [BrowseService], que hace el ciclo y programa el siguiente. */
 class CycleReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val ctx = context.applicationContext
         with(LoadTest) { if (!ctx.enabled) return }
-        // Las alarmas llegan como difusión en segundo plano: hay ~60 s antes de un ANR. Los
-        // tiempos de espera de red (8 s) mantienen el ciclo muy por debajo.
-        val result = goAsync()
-        val wl = ctx.getSystemService(PowerManager::class.java)
-            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "loadtest:ciclo").apply { acquire(2 * 60_000L) }
-        Thread {
-            try {
-                LoadTest.runCycle(ctx)
-            } catch (e: Throwable) {
-                LoadTest.logFile(ctx).appendText("# error del ciclo: $e\n")
-            } finally {
-                with(LoadTest) { if (ctx.enabled) LoadTest.schedule(ctx, ctx.intervalMinutes * 60_000L) }
-                wl.release()
-                result.finish()
-            }
-        }.start()
+        ctx.startForegroundService(Intent(ctx, BrowseService::class.java))
     }
 }
 

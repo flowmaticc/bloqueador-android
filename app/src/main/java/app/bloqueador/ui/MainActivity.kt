@@ -41,6 +41,11 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    companion object {
+        /** Abrir el historial con el filtro "Amenazas" (desde el aviso de sitio peligroso). */
+        const val EXTRA_OPEN_THREATS = "open_threats"
+    }
 }
 
 private enum class Screen { ONBOARDING, HOME, SETTINGS, STRATEGY, APPS, HISTORY }
@@ -58,11 +63,15 @@ private fun AppRoot() {
     var settingsSection by rememberSaveable {
         mutableStateOf(if (fromUpdate) SettingsSection.APP_UPDATES.name else null)
     }
+    val fromThreat = remember {
+        (context as? android.app.Activity)?.intent?.getBooleanExtra(MainActivity.EXTRA_OPEN_THREATS, false) == true
+    }
     var screen by rememberSaveable {
         mutableStateOf(
             when {
                 !settings.onboardingDone -> Screen.ONBOARDING
                 fromUpdate -> Screen.SETTINGS
+                fromThreat -> Screen.HISTORY
                 else -> Screen.HOME
             }
         )
@@ -80,7 +89,7 @@ private fun AppRoot() {
 
         Screen.HISTORY -> {
             BackHandler { screen = Screen.HOME }
-            HistoryScreen(onBack = { screen = Screen.HOME })
+            HistoryScreen(onBack = { screen = Screen.HOME }, startWithThreats = fromThreat)
         }
 
         Screen.SETTINGS -> {

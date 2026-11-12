@@ -41,15 +41,15 @@ object BatteryGuide {
     fun manufacturerSteps(): String? = when (Build.MANUFACTURER.lowercase()) {
         "samsung" ->
             "Samsung: Ajustes → Batería → Límites de uso en segundo plano → \"Aplicaciones que nunca " +
-                "entran en suspensión\" → añade Bloqueador."
+                "entran en suspensión\" → añade Garbillo."
         "xiaomi", "redmi", "poco" ->
-            "Xiaomi: Ajustes → Aplicaciones → Bloqueador → activa \"Inicio automático\" y en " +
+            "Xiaomi: Ajustes → Aplicaciones → Garbillo → activa \"Inicio automático\" y en " +
                 "\"Ahorro de batería\" elige \"Sin restricciones\"."
         "huawei", "honor" ->
-            "Huawei/Honor: Ajustes → Batería → Inicio de aplicaciones → Bloqueador → \"Gestionar " +
+            "Huawei/Honor: Ajustes → Batería → Inicio de aplicaciones → Garbillo → \"Gestionar " +
                 "manualmente\" y activa las tres opciones."
         "oppo", "realme", "oneplus" ->
-            "OPPO/Realme/OnePlus: Ajustes → Batería → Bloqueador → permite la actividad en segundo plano."
+            "OPPO/Realme/OnePlus: Ajustes → Batería → Garbillo → permite la actividad en segundo plano."
         else -> null
     }
 
@@ -85,8 +85,8 @@ fun BatteryGuideCard() {
     SectionCard("Que Android no cierre el filtro") {
         Text(
             "El ahorro de batería del sistema puede cerrar el filtro cuando no usas el móvil. " +
-                "Bloqueador apenas gasta (está dormido hasta que llega una consulta), así que es seguro " +
-                "excluirlo: busca Bloqueador en la lista y elige \"No optimizar\" o \"Sin restricciones\".",
+                "Garbillo apenas gasta (está dormido hasta que llega una consulta), así que es seguro " +
+                "excluirlo: busca Garbillo en la lista y elige \"No optimizar\" o \"Sin restricciones\".",
             style = MaterialTheme.typography.bodyMedium,
         )
         BatteryGuide.manufacturerSteps()?.let { Text(it, style = MaterialTheme.typography.bodySmall) }

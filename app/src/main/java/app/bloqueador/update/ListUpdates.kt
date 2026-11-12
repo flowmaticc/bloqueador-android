@@ -123,7 +123,7 @@ object UpdateNotifier {
             NotificationChannel(CHANNEL_ID, "Actualización de listas", NotificationManager.IMPORTANCE_LOW)
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_shield)
+            .setSmallIcon(R.drawable.ic_stat_garbillo)
             .setContentTitle("No se pudieron actualizar las listas")
             .setContentText("El filtro sigue funcionando con las listas que ya tienes.")
             .setStyle(

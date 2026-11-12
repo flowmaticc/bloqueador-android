@@ -45,7 +45,7 @@ fun OnboardingScreen(onDone: () -> Unit) {
 
     when (step) {
         0 -> OnboardingPage(
-            title = "Bienvenido a Bloqueador",
+            title = "Bienvenido a Garbillo",
             button = "Continuar",
             onNext = { step = 1 },
         ) {
@@ -137,4 +137,4 @@ internal const val LIMITS_TEXT =
     "Los anuncios de YouTube y Twitch y las publicaciones promocionadas de redes sociales llegan por " +
         "los mismos servidores que el contenido, así que ningún bloqueador de este tipo puede quitarlos. " +
         "Dentro de las webs puede quedar el hueco del anuncio: para eso, usa Brave o Firefox con " +
-        "uBlock Origin; se complementan con Bloqueador."
+        "uBlock Origin; se complementan con Garbillo."

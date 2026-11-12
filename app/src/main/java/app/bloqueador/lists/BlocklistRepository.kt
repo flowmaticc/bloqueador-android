@@ -3,6 +3,7 @@ package app.bloqueador.lists
 import android.content.Context
 import app.bloqueador.filter.BlocklistParser
 import app.bloqueador.filter.DomainMatcher
+import app.bloqueador.filter.FilterEngine
 import app.bloqueador.settings.AppSettings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -20,7 +21,7 @@ data class UpdateResult(val changed: Boolean, val errors: List<String>) {
 /** Una lista descargable. [id] es también el nombre del fichero local. */
 data class ListSource(val id: String, val label: String, val description: String, val url: String)
 
-private const val HAGEZI = "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock"
+private const val HAGEZI = HAGEZI_URL
 
 /**
  * Nivel de agresividad → lista base de Hagezi en formato adblock.
@@ -112,12 +113,18 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
     private val dir = File(context.filesDir, "lists").apply { mkdirs() }
     private val prefs = context.getSharedPreferences("lists", Context.MODE_PRIVATE)
 
-    /** Listas activas ahora mismo: la base del modo + las capas marcadas. */
-    fun activeSources(): List<ListSource> {
+    /** Listas activas ahora mismo: la base del modo, las capas marcadas y la de amenazas. */
+    fun activeSources(): List<ListSource> = adSources() + listOfNotNull(threatSource())
+
+    /** Listas de publicidad y rastreo activas: la base del modo + las capas marcadas. */
+    private fun adSources(): List<ListSource> {
         val layers = settings.layers
         return listOf(settings.mode.source) +
             ExtraLayers.available(android.os.Build.MANUFACTURER).filter { it.id in layers }
     }
+
+    /** Lista de amenazas activa, o null si la protección está desactivada. */
+    fun threatSource(): ListSource? = settings.threatLevel.source.takeIf { settings.threatProtection }
 
     private fun fileFor(source: ListSource) = File(dir, "${source.id}.txt")
 
@@ -134,15 +141,23 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
      * Construye el motor con todas las listas activas que estén en disco y las reglas del usuario.
      * Las reglas del usuario se aplican siempre, también si aún no hay ninguna lista descargada.
      */
-    suspend fun load(): DomainMatcher = withContext(Dispatchers.IO) {
+    suspend fun load(): FilterEngine.Filters = withContext(Dispatchers.IO) {
         val builder = BlocklistParser.Builder()
-        for (source in activeSources()) {
+        for (source in adSources()) {
             val file = fileFor(source)
             if (file.isFile) file.bufferedReader().useLines { BlocklistParser.parse(it, builder) }
         }
         settings.blockedDomains.forEach(builder.suffix::add)
         settings.allowedDomains.forEach(builder.allowSuffix::add)
-        builder.build()
+
+        // Amenazas en su propio motor; las excepciones del usuario también valen aquí.
+        val threats = threatSource()?.let { fileFor(it) }?.takeIf { it.isFile }?.let { file ->
+            val t = BlocklistParser.Builder()
+            file.bufferedReader().useLines { BlocklistParser.parse(it, t) }
+            settings.allowedDomains.forEach(t.allowSuffix::add)
+            t.build()
+        } ?: DomainMatcher.EMPTY
+        FilterEngine.Filters(builder.build(), threats)
     }
 
     /** Descarga solo las listas activas que todavía no están en disco. @return true si bajó alguna. */
@@ -157,7 +172,8 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
 
     /** Borra listas que ya no usa ningún modo ni capa (p. ej. las de versiones anteriores). */
     private fun pruneUnused() {
-        val known = (BlockMode.entries.map { it.source } + ExtraLayers.available(android.os.Build.MANUFACTURER))
+        val known = (BlockMode.entries.map { it.source } + ExtraLayers.available(android.os.Build.MANUFACTURER) +
+            ThreatLevel.entries.map { it.source })
             .map { "${it.id}.txt" }.toSet()
         dir.listFiles()?.filter { it.isFile && it.name.endsWith(".txt") && it.name !in known }?.forEach { it.delete() }
     }
@@ -216,7 +232,7 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
         val conn = (URL(source.url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 15_000
             readTimeout = 30_000
-            setRequestProperty("User-Agent", "Bloqueador-Android")
+            setRequestProperty("User-Agent", "Garbillo-Android")
             if (target.isFile) prefs.getString(etagKey, null)?.let { setRequestProperty("If-None-Match", it) }
         }
         try {
