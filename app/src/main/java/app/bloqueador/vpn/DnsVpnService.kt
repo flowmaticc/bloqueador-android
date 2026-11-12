@@ -30,7 +30,9 @@ import app.bloqueador.dns.IpPacket
 import app.bloqueador.dns.UdpPacket
 import app.bloqueador.BuildConfig
 import app.bloqueador.debug.QueryLog
+import app.bloqueador.filter.DomainMatcher
 import app.bloqueador.filter.FilterEngine
+import kotlinx.coroutines.withContext
 import app.bloqueador.ui.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -139,6 +141,19 @@ class DnsVpnService : VpnService() {
         val history = app.history
         recorder = HistoryRecorder(scope) { history.write(it) }
 
+        // Si las listas ya están en el móvil, se cargan ANTES de abrir el túnel. Si no, las primeras
+        // consultas pasarían sin filtrar mientras cargan, y Android guarda esas respuestas en su
+        // caché varios minutos: esos anuncios seguirían cargando un rato.
+        scope.launch {
+            if (app.engine.matcher === DomainMatcher.EMPTY && app.repository.hasListsOnDisk()) {
+                runCatching { app.reloadEngine() }.onFailure { Log.w(TAG, "No se pudo cargar la lista", it) }
+            }
+            withContext(Dispatchers.Main) { openAndStart() }
+        }
+    }
+
+    private fun openAndStart() {
+        if (forwarder == null) return // se detuvo mientras cargaban las listas
         val opened = openTunnel()
         if (Build.VERSION.SDK_INT >= 29) app.settings.alwaysOnVpn = isAlwaysOn
         if (opened == null) {
