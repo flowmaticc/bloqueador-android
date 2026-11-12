@@ -13,7 +13,7 @@ import androidx.room.RoomDatabase
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Una entrada del historial (sección 7). Varias consultas iguales (mismo dominio, app y resultado)
+ * Una entrada del historial. Varias consultas iguales (mismo dominio, app y resultado)
  * dentro de la misma ventana de escritura se agrupan en una fila con [count].
  */
 @Entity(tableName = "dns_events", indices = [Index("timestamp")])
@@ -25,17 +25,18 @@ data class HistoryEvent(
     /** Paquete de la app que hizo la consulta; null si Android no lo indica (< Android 10). */
     val appPackage: String?,
     val blocked: Boolean,
-    /** "dns" (filtro DNS) o "accessibility" (bloqueo visual). */
+    /** Origen de la entrada; hoy siempre "dns" (filtro DNS). */
     val source: String,
     /** Regla que provocó el bloqueo, p. ej. `||ads.com^`; null si se permitió. */
     val matchedRule: String?,
     val count: Int,
-    /** Miniatura del elemento bloqueado (solo accesibilidad, Android 11+). */
-    val thumbnailPath: String? = null,
 )
 
+/** Dominio y hora, para [HistoryDao.allowedAround]. */
+data class DomainAt(val domain: String, val timestamp: Long)
+
 /** Qué entradas mostrar en la lista. */
-enum class HistoryFilter(val label: String) { BLOCKED("Bloqueadas"), ALLOWED("Permitidas"), ALL("Todas"), VISUAL("Visuales") }
+enum class HistoryFilter(val label: String) { BLOCKED("Bloqueadas"), ALLOWED("Permitidas"), ALL("Todas") }
 
 @Dao
 interface HistoryDao {
@@ -48,12 +49,22 @@ interface HistoryDao {
         SELECT * FROM dns_events
         WHERE timestamp >= :since
           AND (:filter = 0 OR (:filter = 1 AND blocked = 1) OR (:filter = 2 AND blocked = 0)
-               OR (:filter = 3 AND source = 'accessibility'))
+)
         ORDER BY timestamp DESC
         LIMIT :limit
         """
     )
     fun observe(since: Long, filter: Int, limit: Int): Flow<List<HistoryEvent>>
+
+    /** Consultas permitidas de [pkg] (o de cualquier app si es null) entre [from] y [to]. */
+    @Query(
+        """
+        SELECT domain, timestamp FROM dns_events
+        WHERE timestamp BETWEEN :from AND :to AND blocked = 0
+          AND (:pkg IS NULL OR appPackage = :pkg)
+        """
+    )
+    suspend fun allowedAround(pkg: String?, from: Long, to: Long): List<DomainAt>
 
     @Query("DELETE FROM dns_events WHERE timestamp < :before")
     suspend fun deleteOlderThan(before: Long): Int
@@ -62,7 +73,7 @@ interface HistoryDao {
     suspend fun deleteAll()
 }
 
-@Database(entities = [HistoryEvent::class], version = 2, exportSchema = false)
+@Database(entities = [HistoryEvent::class], version = 3, exportSchema = false)
 abstract class HistoryDatabase : RoomDatabase() {
     abstract fun dao(): HistoryDao
 

@@ -27,7 +27,7 @@ import app.bloqueador.settings.UpdateFrequency
 import app.bloqueador.ui.MainActivity
 import java.util.concurrent.TimeUnit
 
-/** Programación de la comprobación periódica de listas (sección 6). */
+/** Programación de la comprobación periódica de listas. */
 object ListUpdateScheduler {
     private const val WORK_NAME = "list-update"
 

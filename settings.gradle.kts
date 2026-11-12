@@ -14,3 +14,5 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Bloqueador"
 include(":app")
+// App auxiliar de pruebas largas (no se publica). Ver docs/PRUEBAS.md.
+include(":loadtest")

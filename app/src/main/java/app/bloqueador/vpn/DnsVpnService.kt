@@ -97,7 +97,9 @@ class DnsVpnService : VpnService() {
     }
 
     override fun onRevoke() {
-        // Otra app VPN ha tomado el control o el usuario lo ha revocado desde Ajustes.
+        // Otra app VPN ha tomado el control o el usuario lo ha revocado desde Ajustes:
+        // no se vuelve a encender solo.
+        app.settings.filterWanted = false
         stopVpn()
     }
 

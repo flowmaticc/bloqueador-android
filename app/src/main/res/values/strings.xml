@@ -3,6 +3,4 @@
     <string name="notif_channel">Estado del filtro</string>
     <string name="notif_running">Filtro DNS activo</string>
     <string name="notif_running_text">Bloqueando publicidad y rastreadores</string>
-    <string name="accessibility_label">Bloqueador · bloqueo visual</string>
-    <string name="accessibility_description">Oculta o pulsa los elementos que tú hayas marcado (anuncios, banners, botones de cerrar) dentro de las apps que elijas. Solo actúa en esas apps y sobre esos elementos. No lee ni guarda lo que escribes ni el contenido de tus apps, y nada sale del móvil.</string>
 </resources>

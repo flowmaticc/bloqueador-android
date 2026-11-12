@@ -1,40 +1,48 @@
 # Bloqueador
 
-Bloqueador de publicidad y rastreadores para Android mediante filtrado DNS local (`VpnService`), sin root.
+Bloqueador de publicidad y rastreadores para **Android**, en todo el móvil (navegador, apps y juegos),
+**sin root**, sin cuentas y sin enviar datos a ningún servidor.
 
-## Estado
+🌐 **Web:** [flowmaticc.github.io/utilities/bloqueador-android](https://flowmaticc.github.io/utilities/bloqueador-android/)
+· 📥 **Descarga:** [última versión estable](https://github.com/flowmaticc/bloqueador-android/releases/latest)
+· 🔒 [Política de privacidad](https://flowmaticc.github.io/utilities/bloqueador-android/privacidad/)
 
-**Fase 1 (núcleo):** túnel DNS-only, parser DNS IPv4/IPv6, motor por sufijos con caché LRU,
-descarga de Hagezi Multi (formato adblock) con ETag y validación, pantalla de activación con contadores
-y aviso de DNS privado.
+## Cómo funciona
 
-**Fase 2 (onboarding y modos):** bienvenida, estrategia de apps (todas / todas excepto / solo las
-elegidas) con detección de apps de banca y pagos, recarga del túnel sin corte, modos Ligero /
-Equilibrado / Estricto, capas extra (anti-evasión DNS, GoodbyeAds, 1Hosts, AdAway, StevenBlack),
-exclusiones y bloqueos propios.
+Crea una **VPN local** (no hay ningún servidor al otro lado) por la que solo pasan las **consultas
+DNS**. Si un dominio está en una lista de publicidad o rastreo, responde que no existe y el anuncio no
+llega a cargarse; el resto se reenvía a tu DNS habitual. El tráfico normal no pasa por la app: solo ve
+nombres de dominio, nunca el contenido.
 
-**Fase 3 (actualización automática):** WorkManager cada 12 h / 24 h / solo manual, con red y batería
-no baja; ETag para no descargar lo que no cambia; una lista que falla no frena las demás; reintentos y
-aviso discreto tras 3 periodos fallidos; recarga en caliente si el filtro está activo.
+- Tres niveles: **Ligero** (Hagezi Light), **Equilibrado** (Hagezi Pro, por defecto) y **Estricto**
+  (Hagezi Pro++), más capas opcionales: anti-evasión DNS, lista del fabricante del móvil, juegos y
+  apps gratis (GoodbyeAds), 1Hosts, AdAway y StevenBlack.
+- Elige qué apps se filtran; las de banca y pagos se excluyen por defecto.
+- **Historial local** (1 a 24 h) con la app que hizo cada consulta, y **"Ver en la web"**: carga la web
+  donde apareció un dominio y rodea en rojo lo que pone en ella.
+- Listas actualizadas automáticamente (solo si cambian) y consumo mínimo de batería.
+- Se actualiza sola desde GitHub Releases, con canal **Estable** (por defecto), **Beta** o **Nightly**.
 
-**Fase 4 (historial):** consultas bloqueadas y permitidas con la app que las hizo (Android 10+), agrupadas
-y guardadas por lotes en Room, conservación de 1 a 24 h, filtros, búsqueda, detalle con la regla y la lista
-de origen, y acciones permitir / bloquear / quitar.
+Lo que **no** puede quitar ningún bloqueador de este tipo: los anuncios de YouTube y Twitch y las
+publicaciones promocionadas de las redes sociales (llegan por los mismos servidores que el contenido).
+Para los huecos de anuncios dentro de las webs, combínalo con Brave o Firefox + uBlock Origin.
 
-**Fase 5 (bloqueo visual, opcional):** servicio de accesibilidad para marcar elementos de una app y
-ocultarlos o pulsarlos, miniaturas en el historial (Android 11+), aviso destacado previo y consumo
-mínimo (sin reglas no recibe eventos).
+## Instalar
 
-**Fase 6 (eficiencia):** motor compacto (613.531 reglas en ~5 MB), sin trabajo en segundo plano
-innecesario, guía de ahorro de energía por fabricante y mediciones en dispositivos reales.
+1. Descarga el APK de la [última versión estable](https://github.com/flowmaticc/bloqueador-android/releases/latest).
+2. Permite la instalación desde tu navegador o gestor de archivos.
+3. Si Play Protect avisa de "app desconocida", pulsa **Más detalles → Instalar de todas formas**
+   (la app no está en Google Play; el código es este).
+4. Abre la app, elige qué apps proteger y activa el filtro aceptando la solicitud de VPN de Android.
 
-**Distribución:** GitHub Releases con actualización automática dentro de la app y tres canales
-(Estable, Beta, Nightly).
+Requiere Android 8.0 o superior.
 
-**Compatibilidad:** `minSdk 26`, `targetSdk 36`, un único AAB (`./gradlew bundleRelease`).
+## Permisos
 
-En compilaciones de depuración se puede forzar la actualización:
-`adb shell am broadcast -a app.bloqueador.debug.RUN_UPDATE -p app.bloqueador`
+VPN (el filtro local) · Internet y estado de la red · Servicio en primer plano · Notificaciones ·
+Ver apps instaladas (para elegir cuáles se filtran) · Instalar actualizaciones · Arranque y
+mantener activo (los añade WorkManager). No pide accesibilidad, captura de pantalla, ubicación,
+contactos ni almacenamiento. Explicación detallada en la [web](https://flowmaticc.github.io/utilities/bloqueador-android/#permisos).
 
 ## Compilar
 
@@ -44,22 +52,35 @@ Requiere JDK 17 y el Android SDK (API 36).
 ./gradlew testDebugUnitTest assembleDebug
 ```
 
-APK de depuración: `app/build/outputs/apk/debug/app-debug.apk`.
+APK de depuración: `app/build/outputs/apk/debug/app-debug.apk`. Pruebas automáticas y herramientas
+de medición: [docs/PRUEBAS.md](docs/PRUEBAS.md).
 
-## Estructura
+### Versiones
+
+- **Nightly:** cada cambio en `main` (pre-release `nightly`, se sustituye).
+- **Beta:** etiqueta `vX.Y.Z-beta.N` o `vX.Y.Z-rc.N`.
+- **Estable:** etiqueta `vX.Y.Z` (antes, actualizar `appVersionName` en `gradle.properties`).
+
+GitHub Actions ([release.yml](.github/workflows/release.yml)) compila, pasa los tests, firma el APK
+y publica cada versión con un `update.json` (versionCode, nombre y huella SHA-256) que usa la app
+para actualizarse. La firma usa secretos cifrados del repositorio.
+
+### Estructura
 
 | Paquete | Contenido |
 |---|---|
 | `dns` | Parser/constructor de mensajes DNS y paquetes IP/UDP |
-| `filter` | Lector de listas, motor de coincidencia, caché LRU |
+| `filter` | Lector de listas, motor de coincidencia compacto, caché LRU |
 | `lists` | Descarga y carga de listas |
 | `apps` | Estrategia de apps, apps instaladas y lista de banca/pagos |
 | `settings` | Configuración persistente |
-| `visual` | Servicio de accesibilidad, reglas visuales y miniaturas |
 | `appupdate` | Actualizaciones de la app desde GitHub Releases (canales) |
-| `history` | Base de datos del historial, registro por lotes y app de origen |
-| `update` | Tarea periódica de actualización y aviso de fallos |
-| `vpn` | `DnsVpnService` y seguimiento del DNS real de la red |
-| `ui` | Pantalla principal (Compose) |
+| `history` | Historial, registro por lotes, app de origen y "Ver en la web" |
+| `update` | Tarea periódica de actualización de listas |
+| `vpn` | `DnsVpnService`, reenvío de consultas y seguimiento del DNS de la red |
+| `ui` | Interfaz (Jetpack Compose) |
 
-Licencia: GPLv3.
+## Licencia
+
+[GNU GPLv3](LICENSE). Las listas de bloqueo pertenecen a sus autores (Hagezi, GoodbyeAds, 1Hosts,
+AdAway, StevenBlack), cada una con su licencia; la app las descarga directamente de sus fuentes.

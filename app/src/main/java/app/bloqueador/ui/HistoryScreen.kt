@@ -3,12 +3,9 @@ package app.bloqueador.ui
 import android.content.Context
 import android.content.pm.PackageManager
 import android.widget.Toast
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,7 +50,7 @@ import java.text.DateFormat
 import java.util.Date
 import java.util.concurrent.ConcurrentHashMap
 
-/** Historial de consultas (modelo pull, sección 7): se consulta cuando el usuario quiere. */
+/** Historial de consultas: solo se lee cuando el usuario lo abre. */
 @Composable
 fun HistoryScreen(onBack: () -> Unit) {
     val context = LocalContext.current
@@ -63,6 +60,7 @@ fun HistoryScreen(onBack: () -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
     var appFilter by rememberSaveable { mutableStateOf<String?>(null) }
     var selected by remember { mutableStateOf<HistoryEvent?>(null) }
+    var preview by remember { mutableStateOf<HistoryEvent?>(null) }
 
     LaunchedEffect(Unit) { app.history.cleanup() }
     val events by remember(filter) { app.history.observe(filter) }.collectAsState(initial = null)
@@ -148,8 +146,13 @@ fun HistoryScreen(onBack: () -> Unit) {
                 appFilter = event.appPackage
                 selected = null
             },
+            onPreview = {
+                preview = event
+                selected = null
+            },
         )
     }
+    preview?.let { WebPreviewDialog(it, onDismiss = { preview = null }) }
 }
 
 @Composable
@@ -175,7 +178,6 @@ private fun HistoryRow(event: HistoryEvent, onClick: () -> Unit) {
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        event.thumbnailPath?.let { Thumbnail(it, 56) }
         Text(
             statusLabel(event),
             style = MaterialTheme.typography.labelMedium,
@@ -185,7 +187,12 @@ private fun HistoryRow(event: HistoryEvent, onClick: () -> Unit) {
 }
 
 @Composable
-private fun HistoryDetailDialog(event: HistoryEvent, onDismiss: () -> Unit, onFilterApp: () -> Unit) {
+private fun HistoryDetailDialog(
+    event: HistoryEvent,
+    onDismiss: () -> Unit,
+    onFilterApp: () -> Unit,
+    onPreview: () -> Unit,
+) {
     val context = LocalContext.current
     val app = BloqueadorApp.instance
     val settings = app.settings
@@ -193,10 +200,6 @@ private fun HistoryDetailDialog(event: HistoryEvent, onDismiss: () -> Unit, onFi
 
     val origins by produceState<List<String>?>(initialValue = null, event.matchedRule) {
         value = event.matchedRule?.let { RuleOrigin.find(it, settings, app.repository, context) } ?: emptyList()
-    }
-    val isVisual = event.source == "accessibility"
-    val visualRule = event.matchedRule?.removePrefix("visual:")?.substringBefore(':')?.let { id ->
-        app.visualRules.state.value.rules.firstOrNull { it.id == id }
     }
     // La regla del usuario que afecta a este dominio, si la hay, para poder deshacerla.
     val userAllow = settings.allowedDomains.firstOrNull { event.domain == it || event.domain.endsWith(".$it") }
@@ -216,19 +219,14 @@ private fun HistoryDetailDialog(event: HistoryEvent, onDismiss: () -> Unit, onFi
         title = { Text(event.domain) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                event.thumbnailPath?.let { Thumbnail(it, 220) }
-                Detail(
-                    "Resultado",
-                    statusLabel(event) +
-                        if (event.source == "accessibility") " (bloqueo visual)" else " (filtro DNS)",
-                )
+                Detail("Resultado", statusLabel(event))
                 Detail("App", appLabel(context, event.appPackage) + (event.appPackage?.let { "\n$it" } ?: ""))
                 Detail(
                     "Hora",
                     DateFormat.getTimeInstance(DateFormat.MEDIUM).format(Date(event.timestamp)) +
                         if (event.count > 1) " (${event.count} consultas)" else "",
                 )
-                if (event.matchedRule != null && !isVisual) {
+                if (event.matchedRule != null) {
                     Detail("Regla", event.matchedRule)
                     Detail(
                         "Lista",
@@ -241,7 +239,7 @@ private fun HistoryDetailDialog(event: HistoryEvent, onDismiss: () -> Unit, onFi
                 }
                 if (userAllow != null) Detail("Tu excepción", userAllow)
                 if (userBlock != null) Detail("Tu bloqueo", userBlock)
-                if (!isVisual) Text(
+                Text(
                     "Recuerda: Android guarda las respuestas unos minutos. Si una app sigue sin funcionar " +
                         "tras permitir un dominio, ciérrala y vuelve a abrirla.",
                     style = MaterialTheme.typography.bodySmall,
@@ -250,12 +248,8 @@ private fun HistoryDetailDialog(event: HistoryEvent, onDismiss: () -> Unit, onFi
         },
         confirmButton = {
             Column(horizontalAlignment = Alignment.End) {
+                TextButton(onClick = onPreview) { Text("Ver en la web") }
                 when {
-                    isVisual -> if (visualRule != null) TextButton(onClick = {
-                        app.visualRules.remove(visualRule.id)
-                        Toast.makeText(context, "Elemento desmarcado", Toast.LENGTH_SHORT).show()
-                        onDismiss()
-                    }) { Text("Dejar de bloquear este elemento") }
                     userAllow != null -> TextButton(onClick = {
                         apply("Excepción quitada") { settings.allowedDomains = settings.allowedDomains - userAllow }
                     }) { Text("Quitar excepción") }
@@ -286,30 +280,7 @@ private fun Detail(label: String, value: String) {
     }
 }
 
-/** "Bloqueada" / "Permitida" para el DNS; "Oculto" / "Pulsado" para el bloqueo visual. */
-private fun statusLabel(e: HistoryEvent): String = when {
-    e.source == "accessibility" && e.matchedRule?.endsWith(":CLICK") == true -> "Pulsado"
-    e.source == "accessibility" -> "Oculto"
-    e.blocked -> "Bloqueada"
-    else -> "Permitida"
-}
-
-/** Miniatura guardada por el bloqueo visual (se carga en segundo plano). */
-@Composable
-private fun Thumbnail(path: String, maxHeight: Int) {
-    val image by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, path) {
-        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            android.graphics.BitmapFactory.decodeFile(path)?.asImageBitmap()
-        }
-    }
-    image?.let {
-        Image(
-            it,
-            contentDescription = "Miniatura del elemento bloqueado",
-            modifier = Modifier.heightIn(max = maxHeight.dp),
-        )
-    }
-}
+private fun statusLabel(e: HistoryEvent): String = if (e.blocked) "Bloqueada" else "Permitida"
 
 private val labelCache = ConcurrentHashMap<String, String>()
 

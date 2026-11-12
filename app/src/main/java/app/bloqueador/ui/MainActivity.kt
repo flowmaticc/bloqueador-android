@@ -20,6 +20,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -42,17 +43,22 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Screen { ONBOARDING, HOME, SETTINGS, STRATEGY, APPS, HISTORY, VISUAL }
+private enum class Screen { ONBOARDING, HOME, SETTINGS, STRATEGY, APPS, HISTORY }
 
 /** Navegación mínima entre pantallas (sin librería: son cinco pantallas en línea). */
 @Composable
 private fun AppRoot() {
     val context = LocalContext.current
     val settings = BloqueadorApp.instance.settings
-    var screen by rememberSaveable {
-        // Desde la notificación de nueva versión se abre directamente Ajustes.
-        val fromUpdate = (context as? android.app.Activity)?.intent
+    // Desde la notificación de nueva versión se abre directamente Ajustes → Actualizaciones de la app.
+    val fromUpdate = remember {
+        (context as? android.app.Activity)?.intent
             ?.getBooleanExtra(app.bloqueador.appupdate.AppUpdateWorker.EXTRA_OPEN_UPDATES, false) == true
+    }
+    var settingsSection by rememberSaveable {
+        mutableStateOf(if (fromUpdate) SettingsSection.APP_UPDATES.name else null)
+    }
+    var screen by rememberSaveable {
         mutableStateOf(
             when {
                 !settings.onboardingDone -> Screen.ONBOARDING
@@ -72,25 +78,25 @@ private fun AppRoot() {
             onOpenHistory = { screen = Screen.HISTORY },
         )
 
-        Screen.VISUAL -> {
-            BackHandler { screen = Screen.SETTINGS }
-            VisualBlockScreen(onBack = { screen = Screen.SETTINGS })
-        }
-
         Screen.HISTORY -> {
             BackHandler { screen = Screen.HOME }
             HistoryScreen(onBack = { screen = Screen.HOME })
         }
 
         Screen.SETTINGS -> {
-            BackHandler { screen = Screen.HOME }
+            fun leave() {
+                settingsSection = null
+                screen = Screen.HOME
+            }
+            BackHandler { leave() }
             SettingsScreen(
-                onBack = { screen = Screen.HOME },
+                section = settingsSection?.let { SettingsSection.valueOf(it) },
+                onOpenSection = { settingsSection = it?.name },
+                onBack = { leave() },
                 onChangeStrategy = {
                     pending = settings.strategy
                     screen = Screen.STRATEGY
                 },
-                onOpenVisual = { screen = Screen.VISUAL },
                 onEditApps = {
                     pending = settings.strategy
                     screen = Screen.APPS

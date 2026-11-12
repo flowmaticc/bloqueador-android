@@ -17,7 +17,7 @@ data class DnsRecord(
 )
 
 /**
- * Agrupa consultas iguales y las escribe por lotes (anexo 14.2: no escribir en disco en cada
+ * Agrupa consultas iguales y las escribe por lotes (para ahorrar batería: no escribir en disco en cada
  * consulta). La primera consulta de un lote programa una escritura a [flushDelayMs]; sin consultas
  * no hay temporizadores ni escrituras.
  */

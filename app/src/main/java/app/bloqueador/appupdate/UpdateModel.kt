@@ -66,7 +66,7 @@ object UpdateParser {
                 draft = o.optBoolean("draft"),
                 publishedAt = o.optString("published_at").takeIf { it.isNotEmpty() && it != "null" }
                     ?.let(Instant::parse) ?: Instant.EPOCH,
-                notes = o.optString("body").takeIf { it != "null" }.orEmpty(),
+                notes = plainText(o.optString("body").takeIf { it != "null" }.orEmpty()),
                 assets = (0 until assets.length()).associate { j ->
                     val a = assets.getJSONObject(j)
                     a.getString("name") to a.getString("browser_download_url")
@@ -74,6 +74,15 @@ object UpdateParser {
             )
         }
     }
+
+    /** Notas de GitHub (Markdown) a texto llano: sin `**`, `#`, ni enlaces en formato Markdown. */
+    internal fun plainText(md: String): String =
+        md.lines().joinToString("\n") { line ->
+            line.trimStart('#', ' ')
+                .replace("**", "")
+                .replace(Regex("""\[([^]]*)]\(([^)]*)\)"""), "$1")
+                .replace(Regex("^[*-] "), "• ")
+        }.trim()
 
     /**
      * La publicación más reciente que acepta [channel]. No se compara por versión: si alguien pasa

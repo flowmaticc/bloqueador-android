@@ -105,3 +105,14 @@ dependencies {
     // org.json real para los tests (en Android viene con el sistema; en la JVM de tests no).
     testImplementation("org.json:json:20240303")
 }
+
+// Informe de cobertura frente a https://adblock.turtlecute.org (descarga las listas; desactivado
+// por defecto). Uso: gradlew testDebugUnitTest --tests '*TurtlecuteCoverageTest' -Pturtlecute
+tasks.withType<Test>().configureEach {
+    systemProperty("turtlecute", (project.findProperty("turtlecute") != null).toString())
+    systemProperty("turtlecute.report", layout.buildDirectory.file("reports/turtlecute.md").get().asFile.path)
+    systemProperty("siteHosts", (project.findProperty("siteHosts") as String?) ?: "")
+    if (project.findProperty("turtlecute") != null || project.findProperty("siteHosts") != null) {
+        outputs.upToDateWhen { false }
+    }
+}

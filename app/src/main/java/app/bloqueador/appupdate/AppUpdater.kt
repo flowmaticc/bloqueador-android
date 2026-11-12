@@ -151,6 +151,11 @@ class AppUpdater(private val context: Context, private val repo: String = BuildC
     }
 }
 
+/** Último resultado de instalación, para que la pantalla de Ajustes lo muestre. */
+object InstallStatus {
+    val message = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+}
+
 /** Recibe el resultado de la instalación; si Android necesita confirmación, abre su diálogo. */
 class InstallResultReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -161,10 +166,25 @@ class InstallResultReceiver : BroadcastReceiver() {
                 context.startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
             PackageInstaller.STATUS_SUCCESS -> Log.i(AppUpdater.TAG, "Actualización instalada")
-            else -> Log.w(
-                AppUpdater.TAG,
-                "Instalación fallida ($status): ${intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)}",
-            )
+            PackageInstaller.STATUS_FAILURE_ABORTED -> InstallStatus.message.value = "Instalación cancelada."
+            else -> {
+                Log.w(
+                    AppUpdater.TAG,
+                    "Instalación fallida ($status): ${intent.getStringExtra(PackageInstaller.EXTRA_STATUS_MESSAGE)}",
+                )
+                val message = when (status) {
+                    PackageInstaller.STATUS_FAILURE_CONFLICT, PackageInstaller.STATUS_FAILURE_INCOMPATIBLE ->
+                        "No se pudo actualizar: la versión instalada está firmada con otra clave. " +
+                            "Desinstálala una vez e instala la de GitHub."
+                    PackageInstaller.STATUS_FAILURE_STORAGE -> "No se pudo actualizar: falta espacio."
+                    PackageInstaller.STATUS_FAILURE_BLOCKED ->
+                        "Google Play Protect bloqueó la actualización. Vuelve a intentarlo y, en su aviso, " +
+                            "pulsa \"Más detalles\" → \"Instalar de todas formas\"."
+                    else -> "No se pudo instalar la actualización."
+                }
+                InstallStatus.message.value = message
+                android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+            }
         }
     }
 }

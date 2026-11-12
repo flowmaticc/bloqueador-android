@@ -115,7 +115,10 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
                 }
                 Switch(
                     checked = running,
-                    onCheckedChange = { on -> if (on) startVpn() else DnsVpnService.stop(context) },
+                    onCheckedChange = { on ->
+                        app.settings.filterWanted = on
+                        if (on) startVpn() else DnsVpnService.stop(context)
+                    },
                 )
             }
         }

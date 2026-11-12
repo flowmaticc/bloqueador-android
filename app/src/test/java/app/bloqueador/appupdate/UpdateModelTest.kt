@@ -65,3 +65,11 @@ class UpdateModelTest {
         assertEquals(UpdateChannel.NIGHTLY, info.channel)
     }
 }
+
+class PlainTextTest {
+    @Test
+    fun `quita el formato Markdown de las notas de GitHub`() {
+        val md = "## Novedades\n* **Rápido**: menos CPU\n**Full Changelog**: [v0.1.0](https://x)"
+        assertEquals("Novedades\n• Rápido: menos CPU\nFull Changelog: v0.1.0", UpdateParser.plainText(md))
+    }
+}

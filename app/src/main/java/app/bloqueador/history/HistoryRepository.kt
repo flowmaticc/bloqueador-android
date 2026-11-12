@@ -34,14 +34,16 @@ class HistoryRepository(private val context: Context, private val settings: AppS
     suspend fun cleanup() {
         val limit = System.currentTimeMillis() - settings.historyRetention.millis
         dao.deleteOlderThan(limit)
-        withContext(Dispatchers.IO) {
-            java.io.File(context.cacheDir, "thumbs").listFiles()?.forEach { if (it.lastModified() < limit) it.delete() }
-        }
     }
 
     suspend fun clear() {
         dao.deleteAll()
-        withContext(Dispatchers.IO) { java.io.File(context.cacheDir, "thumbs").listFiles()?.forEach { it.delete() } }
+    }
+
+    /** Webs en las que probablemente apareció [event] (ver [SiteGuess]). */
+    suspend fun guessSites(event: HistoryEvent): List<String> {
+        val around = dao.allowedAround(event.appPackage, event.timestamp - 120_000, event.timestamp + 15_000)
+        return SiteGuess.candidates(event.domain, event.timestamp, around.map { it.domain to it.timestamp })
     }
 
     fun observe(filter: HistoryFilter): Flow<List<HistoryEvent>> {
@@ -49,7 +51,6 @@ class HistoryRepository(private val context: Context, private val settings: AppS
             HistoryFilter.ALL -> 0
             HistoryFilter.BLOCKED -> 1
             HistoryFilter.ALLOWED -> 2
-            HistoryFilter.VISUAL -> 3
         }
         return dao.observe(System.currentTimeMillis() - settings.historyRetention.millis, code, MAX_ROWS)
     }
