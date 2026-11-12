@@ -25,9 +25,9 @@ private const val HAGEZI = "https://raw.githubusercontent.com/hagezi/dns-blockli
 /**
  * Nivel de agresividad → lista base de Hagezi en formato adblock.
  *
- * Desde 0.2.0 Equilibrado usa Pro y Estricto Pro++: la lista Normal bloqueaba los mismos anuncios
- * que la Light (medido con varias webs de test). Los identificadores cambian para que se
- * descargue la lista nueva en vez de usar la que hubiera en disco.
+ * Equilibrado usa Hagezi Pro (la que recomienda su autor) y Estricto Pro++. La lista Normal se
+ * descarta porque bloquea prácticamente los mismos anuncios que la Light. El id de cada lista es
+ * también el nombre del fichero en disco.
  */
 enum class BlockMode(val label: String, val description: String, val source: ListSource) {
     LIGHT(
