@@ -62,6 +62,10 @@ fun OnboardingScreen(onDone: () -> Unit) {
                 "Comprueba a qué dirección quiere conectarse cada app. No puede ver el contenido de lo que haces.",
             )
             Bullet(
+                "Lo que no puede quitar",
+                LIMITS_TEXT,
+            )
+            Bullet(
                 "Verás una llave y una notificación fija",
                 "Android las muestra siempre que hay una VPN activa. Es normal y no gasta batería.",
             )
@@ -127,3 +131,10 @@ private fun Bullet(title: String, text: String) {
         Text(text, style = MaterialTheme.typography.bodyMedium)
     }
 }
+
+/** Límites de un bloqueador por DNS, dichos con claridad. */
+internal const val LIMITS_TEXT =
+    "Los anuncios de YouTube y Twitch y las publicaciones promocionadas de redes sociales llegan por " +
+        "los mismos servidores que el contenido, así que ningún bloqueador de este tipo puede quitarlos. " +
+        "Dentro de las webs puede quedar el hueco del anuncio: para eso, usa Brave o Firefox con " +
+        "uBlock Origin; se complementan con Bloqueador."

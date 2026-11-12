@@ -22,7 +22,13 @@ data class ListSource(val id: String, val label: String, val description: String
 
 private const val HAGEZI = "https://raw.githubusercontent.com/hagezi/dns-blocklists/main/adblock"
 
-/** Nivel de agresividad → lista base de Hagezi en formato adblock (sección 4 de la especificación). */
+/**
+ * Nivel de agresividad → lista base de Hagezi en formato adblock.
+ *
+ * Desde 0.2.0 Equilibrado usa Pro y Estricto Pro++: la lista Normal bloqueaba los mismos anuncios
+ * que la Light (medido con varias webs de test). Los identificadores cambian para que se
+ * descargue la lista nueva en vez de usar la que hubiera en disco.
+ */
 enum class BlockMode(val label: String, val description: String, val source: ListSource) {
     LIGHT(
         "Ligero", "Máxima compatibilidad. Riesgo muy bajo de que algo deje de funcionar.",
@@ -30,15 +36,15 @@ enum class BlockMode(val label: String, val description: String, val source: Lis
     ),
     BALANCED(
         "Equilibrado", "Recomendado para el día a día: configurar y olvidar.",
-        ListSource("balanced", "Hagezi Multi", "", "$HAGEZI/multi.txt"),
+        ListSource("pro", "Hagezi Pro", "", "$HAGEZI/pro.txt"),
     ),
     STRICT(
         "Estricto", "Privacidad agresiva. Puede romper alguna app o enlace.",
-        ListSource("strict", "Hagezi Pro", "", "$HAGEZI/pro.txt"),
+        ListSource("proplus", "Hagezi Pro++", "", "$HAGEZI/pro.plus.txt"),
     ),
 }
 
-/** Capas opcionales que se suman a la lista base (modo Personalizado, sección 5). */
+/** Capas opcionales que se suman a la lista base. */
 object ExtraLayers {
     val all = listOf(
         ListSource(
@@ -47,8 +53,8 @@ object ExtraLayers {
             "$HAGEZI/doh.txt",
         ),
         ListSource(
-            "goodbyeads", "GoodbyeAds",
-            "Publicidad dentro de apps móviles.",
+            "goodbyeads", "Juegos y apps gratis",
+            "Anuncios de juegos y apps gratuitas (lista GoodbyeAds). Puede romper alguna recompensa por ver anuncios.",
             "https://raw.githubusercontent.com/jerryn70/GoodbyeAds/master/Hosts/GoodbyeAds.txt",
         ),
         ListSource(
@@ -67,11 +73,39 @@ object ExtraLayers {
             "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
         ),
     )
+
+    /** Capas que vienen activadas en una instalación nueva. */
+    const val DEFAULT_LAYER = "doh"
+
+    /**
+     * Lista de publicidad y rastreo del fabricante del móvil (Hagezi "native"), si hay una para esa
+     * marca. [manufacturer] es `Build.MANUFACTURER` ("samsung", "Xiaomi"…).
+     */
+    fun vendorFor(manufacturer: String?): ListSource? {
+        val m = manufacturer.orEmpty().lowercase()
+        val (file, brand) = when {
+            m.contains("samsung") -> "native.samsung" to "Samsung"
+            m.contains("xiaomi") || m.contains("redmi") || m.contains("poco") -> "native.xiaomi" to "Xiaomi"
+            m.contains("oppo") || m.contains("realme") || m.contains("oneplus") -> "native.oppo-realme" to "Oppo, Realme y OnePlus"
+            m.contains("huawei") || m.contains("honor") -> "native.huawei" to "Huawei"
+            m.contains("vivo") || m.contains("iqoo") -> "native.vivo" to "Vivo"
+            m.contains("amazon") -> "native.amazon" to "Amazon"
+            else -> return null
+        }
+        return ListSource(
+            "vendor", "Fabricante: $brand",
+            "Publicidad y rastreo del propio sistema de tu móvil $brand.",
+            "$HAGEZI/$file.txt",
+        )
+    }
+
+    /** Capas que se ofrecen en este móvil: la del fabricante (si la hay) primero. */
+    fun available(manufacturer: String?): List<ListSource> = listOfNotNull(vendorFor(manufacturer)) + all
 }
 
 /**
  * Descarga y carga de listas según la configuración: lista base del modo elegido, capas extra y
- * reglas propias del usuario. La programación periódica con WorkManager llega en la Fase 3.
+ * reglas propias del usuario. La comprobación periódica la programa ListUpdateScheduler.
  */
 class BlocklistRepository(context: Context, private val settings: AppSettings) {
 
@@ -81,7 +115,8 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
     /** Listas activas ahora mismo: la base del modo + las capas marcadas. */
     fun activeSources(): List<ListSource> {
         val layers = settings.layers
-        return listOf(settings.mode.source) + ExtraLayers.all.filter { it.id in layers }
+        return listOf(settings.mode.source) +
+            ExtraLayers.available(android.os.Build.MANUFACTURER).filter { it.id in layers }
     }
 
     private fun fileFor(source: ListSource) = File(dir, "${source.id}.txt")
@@ -112,11 +147,19 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
 
     /** Descarga solo las listas activas que todavía no están en disco. @return true si bajó alguna. */
     suspend fun downloadMissing(): Boolean {
+        pruneUnused()
         var changed = false
         for (source in activeSources()) {
             if (!fileFor(source).isFile && download(source)) changed = true
         }
         return changed
+    }
+
+    /** Borra listas que ya no usa ningún modo ni capa (p. ej. las de versiones anteriores). */
+    private fun pruneUnused() {
+        val known = (BlockMode.entries.map { it.source } + ExtraLayers.available(android.os.Build.MANUFACTURER))
+            .map { "${it.id}.txt" }.toSet()
+        dir.listFiles()?.filter { it.isFile && it.name.endsWith(".txt") && it.name !in known }?.forEach { it.delete() }
     }
 
     /**

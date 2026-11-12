@@ -10,3 +10,6 @@ captures/
 *.jks
 *.keystore
 keystore.properties
+
+# Documentación interna (especificación, mediciones en dispositivos, notas de publicación): solo en local
+/privado/

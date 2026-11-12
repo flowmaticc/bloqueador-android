@@ -89,6 +89,9 @@ EOF
 tap_node text "Ver historial" && sleep 2 && a exec-out screencap -p > "$OUT/3-historial.png"
 a shell input keyevent KEYCODE_BACK; sleep 1
 
+# Dominios del test de adblock.turtlecute.org a través del filtro (informativo: no suma fallos).
+bash "$(dirname "$0")/turtlecute-device.sh" "$SERIAL" "$OUT" || true
+
 tap_switch; sleep 3
 VPN=$(a shell ip addr show tun0 2>/dev/null | grep -c '10.111.222.1')
 [ "$VPN" -eq 0 ] && ok "VPN se apaga" || bad "VPN sigue activa"

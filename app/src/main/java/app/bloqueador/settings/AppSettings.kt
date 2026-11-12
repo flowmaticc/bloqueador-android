@@ -3,15 +3,16 @@ package app.bloqueador.settings
 import android.content.Context
 import app.bloqueador.apps.AppStrategy
 import app.bloqueador.lists.BlockMode
+import app.bloqueador.lists.ExtraLayers
 
-/** Frecuencia de actualización automática de listas (sección 6). [hours] = 0 → solo manual. */
+/** Frecuencia de actualización automática de listas. [hours] = 0 → solo manual. */
 enum class UpdateFrequency(val label: String, val description: String, val hours: Long) {
     EVERY_12H("Cada 12 horas", "Recomendado.", 12),
     EVERY_24H("Cada 24 horas", "Algo menos de datos y batería.", 24),
     MANUAL("Solo manual", "Solo cuando pulses \"Actualizar ahora\".", 0),
 }
 
-/** Tiempo que se conserva el historial (sección 7.2). */
+/** Tiempo que se conserva el historial. */
 enum class HistoryRetention(val label: String, val hours: Long) {
     H1("1 hora", 1), H3("3 horas", 3), H6("6 horas", 6), H24("24 horas", 24);
 
@@ -22,6 +23,19 @@ enum class HistoryRetention(val label: String, val hours: Long) {
 class AppSettings(context: Context) {
 
     private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+
+    init {
+        // 0.2.0: Anti-evasión DNS pasa a estar activada por defecto, también para quien ya tenía la app.
+        if (prefs.getInt("settings_version", 1) < 2) {
+            val edit = prefs.edit().putInt("settings_version", 2)
+            if (prefs.contains("layers")) edit.putStringSet("layers", stringSet("layers") + ExtraLayers.DEFAULT_LAYER)
+            edit.apply()
+        }
+    }
+
+    /** Capas activadas de serie: anti-evasión y, si existe, la lista del fabricante. */
+    private val defaultLayers: Set<String> =
+        setOfNotNull(ExtraLayers.DEFAULT_LAYER, ExtraLayers.vendorFor(android.os.Build.MANUFACTURER)?.id)
 
     var onboardingDone: Boolean
         get() = prefs.getBoolean("onboarding_done", false)
@@ -47,7 +61,7 @@ class AppSettings(context: Context) {
 
     /** Identificadores de las capas adicionales activadas (modo Personalizado). */
     var layers: Set<String>
-        get() = stringSet("layers")
+        get() = if (prefs.contains("layers")) stringSet("layers") else defaultLayers
         set(v) = prefs.edit().putStringSet("layers", v).apply()
 
     /** Cada cuánto se comprueban las listas en segundo plano. */
@@ -55,6 +69,11 @@ class AppSettings(context: Context) {
         get() = UpdateFrequency.entries.firstOrNull { it.name == prefs.getString("update_frequency", null) }
             ?: UpdateFrequency.EVERY_12H
         set(v) = prefs.edit().putString("update_frequency", v.name).apply()
+
+    /** El usuario quiere el filtro encendido (para reactivarlo tras actualizar la app). */
+    var filterWanted: Boolean
+        get() = prefs.getBoolean("filter_wanted", false)
+        set(v) = prefs.edit().putBoolean("filter_wanted", v).apply()
 
     /** Canal de actualizaciones de la propia app (Estable por defecto). */
     var updateChannel: app.bloqueador.appupdate.UpdateChannel
@@ -95,7 +114,7 @@ class AppSettings(context: Context) {
 
     /** true si hay algo más que la lista base: la app lo muestra como modo "Personalizado". */
     val isCustom: Boolean
-        get() = layers.isNotEmpty() || allowedDomains.isNotEmpty() || blockedDomains.isNotEmpty()
+        get() = (layers - defaultLayers).isNotEmpty() || allowedDomains.isNotEmpty() || blockedDomains.isNotEmpty()
 
     private fun stringSet(key: String): Set<String> = HashSet(prefs.getStringSet(key, emptySet()) ?: emptySet())
 

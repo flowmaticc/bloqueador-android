@@ -24,7 +24,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 
 /**
- * Guía para que el ahorro de energía del sistema no cierre el filtro (sección 10).
+ * Guía para que el ahorro de energía del sistema no cierre el filtro.
  *
  * El servicio VPN en primer plano ya está protegido por Android, pero algunos fabricantes añaden
  * su propia capa de ahorro que cierra apps "dormidas". Solo se muestra si la app aún está sujeta a

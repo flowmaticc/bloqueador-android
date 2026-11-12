@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -40,6 +41,15 @@ fun AppUpdateSection() {
     var busy by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(-1f) }
 
+    // El resultado final de la instalación llega por el receptor del sistema.
+    val installResult by app.bloqueador.appupdate.InstallStatus.message.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(installResult) {
+        installResult?.let {
+            status = it
+            app.bloqueador.appupdate.InstallStatus.message.value = null
+        }
+    }
+
     fun check() {
         busy = true
         status = "Buscando…"
@@ -67,6 +77,7 @@ fun AppUpdateSection() {
         busy = true
         progress = 0f
         status = "Descargando ${info.versionName}…"
+        app.bloqueador.appupdate.InstallStatus.message.value = null
         scope.launch {
             status = try {
                 val apk = updater.download(info) { progress = it }

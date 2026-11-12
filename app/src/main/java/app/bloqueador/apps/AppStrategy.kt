@@ -1,6 +1,6 @@
 package app.bloqueador.apps
 
-/** Qué apps pasan por el filtro (sección 3 de la especificación). */
+/** Qué apps pasan por el filtro. */
 enum class AppStrategy(val label: String, val description: String) {
     ALL("Todas las apps", "Se filtra todo el dispositivo."),
     ALL_EXCEPT("Todas excepto las que elija", "Se filtra todo salvo las apps que marques."),

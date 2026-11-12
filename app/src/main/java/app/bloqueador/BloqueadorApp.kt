@@ -3,7 +3,6 @@ package app.bloqueador
 import android.app.Application
 import app.bloqueador.filter.FilterEngine
 import app.bloqueador.history.HistoryRepository
-import app.bloqueador.visual.VisualRuleStore
 import app.bloqueador.lists.BlocklistRepository
 import app.bloqueador.settings.AppSettings
 import app.bloqueador.update.ListUpdateScheduler
@@ -21,9 +20,6 @@ class BloqueadorApp : Application() {
         private set
 
     lateinit var history: HistoryRepository
-        private set
-
-    lateinit var visualRules: VisualRuleStore
         private set
 
     val engine = FilterEngine()
@@ -46,9 +42,15 @@ class BloqueadorApp : Application() {
         settings = AppSettings(this)
         repository = BlocklistRepository(this, settings)
         history = HistoryRepository(this, settings)
-        visualRules = VisualRuleStore(this)
+        removeVisualBlockLeftovers()
         ListUpdateScheduler.schedule(this, settings.updateFrequency, replace = false)
         AppUpdateWorker.schedule(this)
+    }
+
+    /** El bloqueo visual (accesibilidad) se quitó en 0.2.0: borra sus reglas y miniaturas. */
+    private fun removeVisualBlockLeftovers() {
+        java.io.File(filesDir, "visual_rules.json").delete()
+        java.io.File(cacheDir, "thumbs").deleteRecursively()
     }
 
     companion object {
