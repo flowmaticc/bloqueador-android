@@ -13,3 +13,7 @@ keystore.properties
 
 # Documentación interna (especificación, mediciones en dispositivos, notas de publicación): solo en local
 /privado/
+
+# Servicio de reportes: dependencias y caché locales de wrangler
+/reportes/node_modules/
+/reportes/.wrangler/

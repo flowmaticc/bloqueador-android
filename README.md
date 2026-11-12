@@ -24,6 +24,9 @@ nombres de dominio, nunca el contenido.
 - Elige qué apps se filtran; las de banca y pagos se excluyen por defecto.
 - **Historial local** (1 a 24 h) con la app que hizo cada consulta, y **"Ver en la web"**: carga la web
   donde apareció un dominio y rodea en rojo lo que pone en ella.
+- **Reportar una web** para que se analice, con un toque desde el historial o desde el formulario de la
+  [web](https://flowmaticc.github.io/utilities/bloqueador-android/#reportar). Se envía solo el dominio, el
+  motivo y una nota opcional (servicio en [`reportes/`](reportes/), sobre Cloudflare Workers).
 - Listas actualizadas automáticamente (solo si cambian) y consumo mínimo de batería.
 - Se actualiza sola desde GitHub Releases, con canal **Estable** (por defecto), **Beta** o **Nightly**.
 
