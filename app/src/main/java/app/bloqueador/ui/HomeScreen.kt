@@ -78,6 +78,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
     var queries by remember { mutableLongStateOf(0) }
     var blocked by remember { mutableLongStateOf(0) }
     var rules by remember { mutableIntStateOf(0) }
+    var threatRules by remember { mutableIntStateOf(0) }
     // Solo mientras la pantalla está a la vista: en segundo plano no se despierta la CPU para nada.
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(lifecycle) {
@@ -86,6 +87,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
                 queries = app.engine.queries.get()
                 blocked = app.engine.blocked.get()
                 rules = app.engine.matcher.size
+                threatRules = app.engine.threats.size
                 lastUpdated = app.repository.lastUpdated // la descarga inicial la hace el servicio
                 delay(1000)
             }
@@ -149,6 +151,8 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
             Text("Modo: ${modeSummary(app.settings)}")
             Text(
                 when {
+                    rules > 0 && threatRules > 0 ->
+                        "%,d reglas de publicidad y %,d de amenazas".format(rules, threatRules)
                     rules > 0 -> "%,d reglas cargadas".format(rules)
                     // Con la VPN apagada no se cargan en memoria, para no gastar RAM.
                     lastUpdated > 0 -> "Listas descargadas (se cargan al activar)"

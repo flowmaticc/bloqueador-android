@@ -215,6 +215,18 @@ private fun HistoryDetailDialog(
         }
     }
 
+    var reporting by remember { mutableStateOf(false) }
+    if (reporting) {
+        ReportDialog(
+            domain = event.domain,
+            suggested = when {
+                FilterEngine.isThreat(event.matchedRule) -> ReportReason.DANGER
+                event.blocked -> ReportReason.BROKEN
+                else -> ReportReason.AD
+            },
+            onDismiss = { reporting = false },
+        )
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(event.domain) },
@@ -258,6 +270,7 @@ private fun HistoryDetailDialog(
         confirmButton = {
             Column(horizontalAlignment = Alignment.End) {
                 TextButton(onClick = onPreview) { Text("Ver en la web") }
+                TextButton(onClick = { reporting = true }) { Text("Reportar para analizar") }
                 when {
                     userAllow != null -> TextButton(onClick = {
                         apply("Excepción quitada") { settings.allowedDomains = settings.allowedDomains - userAllow }

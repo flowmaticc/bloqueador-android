@@ -1,0 +1,13 @@
+# Servicio de reportes de Garbillo (Cloudflare Workers, plan gratuito).
+# Despliegue: npx wrangler deploy  ·  Token de GitHub: npx wrangler secret put GITHUB_TOKEN
+name = "garbillo-reportes"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+[vars]
+REPO = "flowmaticc/garbillo-reportes"
+
+# Límite de envíos por conexión y día. El id lo da: npx wrangler kv namespace create LIMITS
+[[kv_namespaces]]
+binding = "LIMITS"
+id = "15a177e3396f44cc9e904e87ab7ad985"
