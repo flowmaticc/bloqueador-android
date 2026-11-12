@@ -128,6 +128,9 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
 
     private fun fileFor(source: ListSource) = File(dir, "${source.id}.txt")
 
+    /** ¿Está ya descargada la lista base del modo actual? */
+    fun hasListsOnDisk(): Boolean = fileFor(settings.mode.source).isFile
+
     /** Momento (ms epoch) de la última comprobación correcta de la lista base, o 0 si nunca. */
     val lastUpdated: Long
         get() {
