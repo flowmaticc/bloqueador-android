@@ -14,5 +14,9 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Bloqueador"
 include(":app")
-// App auxiliar de pruebas largas (no se publica). Ver docs/PRUEBAS.md.
-include(":loadtest")
+// Herramienta privada de pruebas largas: no forma parte del repositorio ni se publica.
+// Solo se incluye si existe en la copia local.
+if (file("privado/loadtest").isDirectory) {
+    include(":loadtest")
+    project(":loadtest").projectDir = file("privado/loadtest")
+}

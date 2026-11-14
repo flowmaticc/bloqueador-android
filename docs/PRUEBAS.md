@@ -7,7 +7,7 @@
 | Cobertura turtlecute (listas) | Qué % de los dominios de [adblock.turtlecute.org](https://adblock.turtlecute.org) bloquea cada modo y capa | `gradlew testDebugUnitTest --tests '*TurtlecuteCoverageTest' -Pturtlecute` → `app/build/reports/turtlecute.md` |
 | Turtlecute en el dispositivo | Lo mismo, pero a través del filtro real del móvil (VPN activa) | `tools/turtlecute-device.sh <serial> [carpeta]` (la prueba de humo ya lo incluye) |
 | Cobertura por sitio | Qué % de los dominios de cualquier web (o test) bloquea cada modo y capa | `gradlew :app:testDebugUnitTest --tests '*SiteCoverageTest' -PsiteHosts=<carpeta>` → `app/build/reports/sites.md`. Cada fichero: dominios separados por espacios, o `categoría<TAB>dominio`. |
-| Prueba de carga larga | Que el filtro aguanta horas sin tocar el móvil, también en reposo profundo | App auxiliar `loadtest` (ver abajo) |
+| Prueba de carga larga | Que el filtro aguanta días sin tocar el móvil, también en reposo profundo | Herramienta privada (ver abajo) |
 
 ## adblock.turtlecute.org
 
@@ -44,34 +44,17 @@ Lo que deja pasar Equilibrado, y por qué:
 
 Quien quiera el 100 % puede usar Estricto o añadir la capa GoodbyeAds.
 
-## Prueba de carga larga (app auxiliar `loadtest`)
+## Prueba de carga larga
 
-Pequeña app aparte ("Prueba de carga", módulo `loadtest/`, no se publica) para dejar un móvil de
-pruebas solo durante horas o días. Cada 20 min despierta el móvil (también en Doze) y, en un servicio
-en primer plano:
-
-1. Resuelve 15 dominios normales y 15 de anuncios con el DNS del sistema —que pasa por el filtro— y
-   anota batería, VPN activa, aciertos y tiempos en `files/log.csv`.
-2. Abre 5 webs reales de una lista variada (`Sites.kt`: medios, deportes, tecnología, recetas, tiempo,
-   ocio, compras, herramientas e internacionales) en un navegador interno, acepta el aviso de cookies
-   como haría la mayoría de la gente (`--ez cookies false` para no hacerlo) y baja por la página.
-   Anota en `files/webs.csv` el tiempo, el número de peticiones y todos los dominios que pidió cada web.
+Se hace con una herramienta privada de pruebas que no forma parte de este repositorio y **nunca se
+publica**: ni ella ni las compilaciones de depuración de Garbillo que se usan con ella. Deja un móvil
+de pruebas solo durante días: cada 20 min comprueba que el filtro responde y abre webs reales.
+Garbillo no se exime de la optimización de batería, para comprobar que sobrevive con los ajustes de
+fábrica del móvil.
 
 ### Registro interno (solo compilaciones de depuración)
 
-Las compilaciones de depuración de la app guardan cada consulta en
-`files/debug/consultas-AAAA-MM-DD.csv` (app, dominio, decisión, regla, tiempo de respuesta del DNS
-real) y estadísticas cada 5 minutos. En la versión publicada ese código no existe: el compilador lo
-elimina. Cruzando ese registro con `webs.csv` se ve, web a web, qué se bloqueó y qué pasó.
-
-```bash
-./gradlew :loadtest:assembleDebug
-adb install -r loadtest/build/outputs/apk/debug/loadtest-debug.apk
-adb shell dumpsys deviceidle whitelist +app.bloqueador.loadtest   # solo la app auxiliar
-adb shell am start -n app.bloqueador.loadtest/.MainActivity --es accion iniciar --ei minutos 15
-adb shell run-as app.bloqueador.loadtest cat files/log.csv          # leer el registro
-adb shell am start -n app.bloqueador.loadtest/.MainActivity --es accion parar
-```
-
-Bloqueador no se exime de la optimización de batería, para comprobar que sobrevive con los ajustes
-de fábrica del móvil. Se reanuda sola si el móvil se reinicia.
+Las compilaciones de depuración guardan en el propio móvil cada consulta
+(`files/debug/consultas-AAAA-MM-DD.csv`: app, dominio, decisión, regla y tiempo de respuesta) para
+analizar las pruebas. **En la versión publicada ese código no existe**: el compilador lo elimina, y
+nada de ese registro sale del móvil.
