@@ -91,6 +91,22 @@ jobs:
             -PversionCode=${{ steps.version.outputs.code }} \
             -PversionName=${{ steps.version.outputs.name }}
 
+      - name: Comprobar que el APK es la versión normal
+        if: steps.version.outputs.skip != 'true'
+        run: |
+          # Solo se publica la app normal: sin el registro de depuración ni herramientas de pruebas.
+          apk=app/build/outputs/apk/release/app-release.apk
+          if unzip -p "$apk" 'classes*.dex' | grep -a -q -E 'QueryLog|consultas-|app/bloqueador/loadtest'; then
+            echo "::error::El APK contiene código de depuración o de pruebas: no se publica."
+            exit 1
+          fi
+          aapt=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | tail -1)
+          "$aapt" dump badging "$apk" | grep -q "^package: name='app.bloqueador'" || { echo "::error::Paquete inesperado"; exit 1; }
+          if "$aapt" dump badging "$apk" | grep -q "application-debuggable"; then
+            echo "::error::El APK es de depuración: no se publica."; exit 1
+          fi
+          echo "APK normal comprobado."
+
       - name: Preparar ficheros de la publicación
         if: steps.version.outputs.skip != 'true'
         run: |
