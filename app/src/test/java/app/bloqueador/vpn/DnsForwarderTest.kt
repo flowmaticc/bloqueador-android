@@ -195,6 +195,27 @@ class DnsForwarderTest {
     }
 
     @Test
+    fun `avisa solo si se pregunta y nadie contesta durante un rato`() {
+        val f = start(listOf(InetAddress.getByName("127.0.0.2")))
+        val now = System.currentTimeMillis()
+        assertFalse("sin consultas no hay problema", f.isUnresponsive(now))
+        f.forward(request("sin-respuesta.example", id = 1), "sin-respuesta.example")
+        assertFalse("recién enviada", f.isUnresponsive(now + 100))
+        f.forward(request("otra.example", id = 2), "otra.example")
+        assertTrue(f.isUnresponsive(System.currentTimeMillis() + DnsForwarder.SILENT_ALERT_MS + 1000))
+        assertFalse("hace mucho que no se pregunta nada", f.isUnresponsive(System.currentTimeMillis() + 60_000))
+    }
+
+    @Test
+    fun `una respuesta quita el aviso`() {
+        val f = start()
+        f.forward(request("ejemplo.com", id = 3), "ejemplo.com")
+        answer(receiveAtServer())
+        assertNotNull(replies.poll(3, TimeUnit.SECONDS))
+        assertFalse(f.isUnresponsive(System.currentTimeMillis() + DnsForwarder.SILENT_ALERT_MS + 1000))
+    }
+
+    @Test
     fun `acepta errores sin seccion de pregunta y compara la pregunta sin distinguir mayusculas`() {
         val query = dnsQuery("Ejemplo.COM", 1)
         val sameLower = dnsQuery("ejemplo.com", 1).also { DnsMessage.put16(it, 2, 0x8180) }
