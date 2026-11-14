@@ -27,6 +27,10 @@ class BloqueadorApp : Application() {
     private val _vpnState = MutableStateFlow<VpnState>(VpnState.Stopped)
     val vpnState: StateFlow<VpnState> = _vpnState
 
+    /** Con el filtro activo: ¿lleva el DNS real un rato sin contestar? (para avisar en la pantalla principal). */
+    @Volatile
+    var dnsUnresponsive: (() -> Boolean)? = null
+
     fun setVpnState(state: VpnState) {
         _vpnState.value = state
     }

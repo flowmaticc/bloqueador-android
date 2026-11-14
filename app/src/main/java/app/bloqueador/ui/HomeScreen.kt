@@ -79,6 +79,9 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
     var blocked by remember { mutableLongStateOf(0) }
     var rules by remember { mutableIntStateOf(0) }
     var threatRules by remember { mutableIntStateOf(0) }
+    var dnsSilent by remember { mutableStateOf(false) }
+    // Se vuelve a leer al volver de los ajustes de Android (el usuario puede haberlo cambiado).
+    var privateDns by remember { mutableStateOf(privateDnsMode(context)) }
     // Solo mientras la pantalla está a la vista: en segundo plano no se despierta la CPU para nada.
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(lifecycle) {
@@ -88,6 +91,8 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
                 blocked = app.engine.blocked.get()
                 rules = app.engine.matcher.size
                 threatRules = app.engine.threats.size
+                dnsSilent = app.dnsUnresponsive?.invoke() == true
+                privateDns = privateDnsMode(context)
                 lastUpdated = app.repository.lastUpdated // la descarga inicial la hace el servicio
                 delay(1000)
             }
@@ -95,6 +100,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
     }
 
     val running = state is VpnState.Running || state == VpnState.Starting
+    val protection = protectionOf(state, rules, dnsSilent, privateDns == "hostname")
 
     Column(
         Modifier
@@ -109,11 +115,18 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
             OutlinedButton(onClick = onOpenSettings) { Text("Ajustes") }
         }
 
-        Card(Modifier.fillMaxWidth()) {
+        Card(
+            Modifier.fillMaxWidth(),
+            colors = if (protection.warning) {
+                CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
+            } else {
+                CardDefaults.cardColors()
+            },
+        ) {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(statusTitle(state), style = MaterialTheme.typography.titleLarge)
-                    Text(statusDetail(state), style = MaterialTheme.typography.bodyMedium)
+                    Text(protection.title, style = MaterialTheme.typography.titleLarge)
+                    Text(protection.detail, style = MaterialTheme.typography.bodyMedium)
                 }
                 Switch(
                     checked = running,
@@ -125,7 +138,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
             }
         }
 
-        if (privateDnsMode(context) == "hostname") {
+        if (privateDns == "hostname") {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
                 Column(Modifier.padding(16.dp)) {
                     Text("El DNS privado está activado", style = MaterialTheme.typography.titleMedium)
@@ -198,19 +211,34 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
     }
 }
 
-private fun statusTitle(state: VpnState) = when (state) {
-    VpnState.Stopped -> "Desactivado"
-    VpnState.Starting -> "Activando…"
-    is VpnState.Running -> "Protegido"
-    is VpnState.Error -> "Error"
-}
+/** Lo que se muestra en la tarjeta de estado. [warning]: el filtro está encendido pero no protege del todo. */
+internal data class Protection(val title: String, val detail: String, val warning: Boolean = false)
 
-private fun statusDetail(state: VpnState) = when (state) {
-    VpnState.Stopped -> "La publicidad no se está filtrando"
-    VpnState.Starting -> "Creando el túnel local"
-    is VpnState.Running -> if (state.loadingList) "Cargando la lista de bloqueo…" else "Filtrando publicidad y rastreadores"
-    is VpnState.Error -> state.message
-}
+/**
+ * Estado real de la protección: con la VPN encendida no basta para decir "Protegido"; también hacen
+ * falta listas cargadas, un DNS que conteste y que Android no se salte el filtro con su DNS privado.
+ */
+internal fun protectionOf(state: VpnState, rules: Int, dnsSilent: Boolean, privateDnsFixed: Boolean): Protection =
+    when (state) {
+        VpnState.Stopped -> Protection("Desactivado", "La publicidad no se está filtrando")
+        VpnState.Starting -> Protection("Activando…", "Preparando el filtro")
+        is VpnState.Error -> Protection("Error", state.message, warning = true)
+        is VpnState.Running -> when {
+            state.loadingList -> Protection("Activando…", "Cargando la lista de bloqueo…")
+            privateDnsFixed -> Protection("Sin efecto", "El DNS privado de Android se salta el filtro (mira el aviso de abajo)", warning = true)
+            rules == 0 -> Protection(
+                "Protección incompleta",
+                "No hay ninguna lista cargada. Comprueba la conexión y pulsa \"Actualizar ahora\".",
+                warning = true,
+            )
+            dnsSilent -> Protection(
+                "Sin respuesta del DNS",
+                "El filtro está activo, pero el DNS de la red no contesta. ¿Hay conexión a Internet?",
+                warning = true,
+            )
+            else -> Protection("Protegido", "Filtrando publicidad y rastreadores")
+        }
+    }
 
 /** "off", "opportunistic" (Automático) o "hostname" (proveedor fijo: se salta el filtro). */
 private fun privateDnsMode(context: Context): String? =

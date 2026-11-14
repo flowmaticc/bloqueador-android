@@ -71,13 +71,29 @@ class DnsVpnService : VpnService() {
 
     private val app get() = application as BloqueadorApp
 
+    // Se asignan en el hilo principal y se leen en el hilo lector del túnel: @Volatile para que el
+    // lector vea siempre el valor vigente (o null tras detener).
     @Volatile
     private var tunnel: Tunnel? = null
     private var upstream: UpstreamDns? = null
+    @Volatile
     private var forwarder: DnsForwarder? = null
+    @Volatile
     private var recorder: HistoryRecorder? = null
+    @Volatile
     private var appResolver: AppResolver? = null
+    @Volatile
     private var threatAlerts: ThreatAlerts? = null
+
+    /** true mientras se cargan las listas antes de abrir el túnel: evita un segundo arranque en paralelo. */
+    @Volatile
+    private var starting = false
+
+    /**
+     * Cambia en cada arranque y en cada parada (siempre en el hilo principal). Un arranque que termina
+     * de cargar las listas cuando ya se ha parado, o se ha vuelto a arrancar, no abre ningún túnel.
+     */
+    private var generation = 0
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
@@ -88,6 +104,9 @@ class DnsVpnService : VpnService() {
                 return START_NOT_STICKY
             }
             ACTION_RELOAD -> {
+                // Durante el arranque no hay nada que recargar: el túnel se abrirá ya con la selección
+                // actual. Sin este caso, stopSelf() detendría el servicio a mitad del arranque.
+                if (starting) return START_STICKY
                 // Solo tiene sentido con el túnel abierto; si no, no hay nada que recargar.
                 if (tunnel == null) {
                     stopSelf(startId)
@@ -98,7 +117,7 @@ class DnsVpnService : VpnService() {
             }
         }
         startInForeground()
-        if (tunnel == null) startVpn()
+        if (tunnel == null && !starting) startVpn()
         return START_STICKY
     }
 
@@ -116,16 +135,20 @@ class DnsVpnService : VpnService() {
     }
 
     private fun startVpn() {
+        starting = true
+        val gen = ++generation
         app.setVpnState(VpnState.Starting)
         app.engine.resetCounters()
         val up = UpstreamDns(this).also { it.start() }
         upstream = up
-        forwarder = DnsForwarder(
+        val fwd = DnsForwarder(
             protect = { protect(it) },
             protectTcp = { protect(it) },
             upstream = { up.current() },
             reply = ::write,
         ).also { it.start() }
+        forwarder = fwd
+        app.dnsUnresponsive = { fwd.isUnresponsive() }
         if (BuildConfig.DEBUG) {
             QueryLog.init(this)
             scope.launch {
@@ -148,12 +171,13 @@ class DnsVpnService : VpnService() {
             if (app.engine.matcher === DomainMatcher.EMPTY && app.repository.hasListsOnDisk()) {
                 runCatching { app.reloadEngine() }.onFailure { Log.w(TAG, "No se pudo cargar la lista", it) }
             }
-            withContext(Dispatchers.Main) { openAndStart() }
+            withContext(Dispatchers.Main) { if (gen == generation) openAndStart() }
         }
     }
 
     private fun openAndStart() {
-        if (forwarder == null) return // se detuvo mientras cargaban las listas
+        starting = false
+        if (forwarder == null || tunnel != null) return // se detuvo mientras cargaban las listas
         val opened = openTunnel()
         if (Build.VERSION.SDK_INT >= 29) app.settings.alwaysOnVpn = isAlwaysOn
         if (opened == null) {
@@ -295,17 +319,19 @@ class DnsVpnService : VpnService() {
         val question = DnsMessage.parseQuery(udp.data, udp.payloadOffset, udp.payloadLength) ?: return
 
         val rule = app.engine.decide(question.name)
-        if (BuildConfig.DEBUG) QueryLog.query(ownerOf(udp), question.name, rule)
+        // Averiguar la app es una llamada al sistema: se hace como mucho una vez por consulta.
+        val owner = lazy(LazyThreadSafetyMode.NONE) { ownerOf(udp) }
+        if (BuildConfig.DEBUG) QueryLog.query(owner.value, question.name, rule)
         if (rule != null) {
             // Se averigua la app antes de responder: tras la respuesta el socket puede cerrarse.
-            record(udp, question.name, rule)
-            if (FilterEngine.isThreat(rule)) threatAlerts?.onThreat(question.name, ownerOf(udp))
+            record(question.name, rule, owner)
+            if (FilterEngine.isThreat(rule)) threatAlerts?.onThreat(question.name, owner.value)
             val response = DnsMessage.buildBlockedResponse(udp.data, question, udp.payloadOffset)
             write(IpPacket.buildUdpReply(udp, response))
         } else {
+            record(question.name, null, owner)
             // Copia independiente del búfer de lectura, que se reutiliza en el siguiente read().
             val request = IpPacket.parseUdp(buffer.copyOf(length), length) ?: return
-            record(request, question.name, null)
             forwarder?.forward(request, question.name)
         }
     }
@@ -314,11 +340,10 @@ class DnsVpnService : VpnService() {
         appResolver?.ownerPackage(udp.source, udp.sourcePort, udp.destination, udp.destinationPort)
 
     /** Anota la consulta en el historial (si está activado), con la app que la hizo. */
-    private fun record(udp: UdpPacket, domain: String, rule: String?) {
+    private fun record(domain: String, rule: String?, owner: Lazy<String?>) {
         val rec = recorder ?: return
         if (!app.settings.historyEnabled) return
-        val pkg = appResolver?.ownerPackage(udp.source, udp.sourcePort, udp.destination, udp.destinationPort)
-        rec.record(DnsRecord(System.currentTimeMillis(), domain, pkg, rule != null, rule))
+        rec.record(DnsRecord(System.currentTimeMillis(), domain, owner.value, rule != null, rule))
     }
 
     /** Escribe en el túnel vigente (tras una recarga, las respuestas pendientes salen por el nuevo). */
@@ -339,6 +364,9 @@ class DnsVpnService : VpnService() {
     }
 
     private fun closeAll() {
+        starting = false
+        generation++
+        app.dnsUnresponsive = null
         tunnel?.let { closeTunnel(it) }
         tunnel = null
         forwarder?.stop()

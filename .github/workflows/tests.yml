@@ -1,0 +1,64 @@
+# Pruebas de cada cambio que no va directo a main: tests unitarios de la app, compilación de
+# depuración y tests del servicio de reportes. No firma ni publica nada.
+
+name: Pruebas
+
+on:
+  push:
+    branches-ignore: [main]
+    paths-ignore: ["docs/**", "**.md", "LICENSE"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Tests unitarios y compilación
+        run: ./gradlew --no-daemon :app:testDebugUnitTest :app:assembleDebug
+
+      - name: Detalle de los tests fallidos
+        if: failure()
+        run: |
+          for f in app/build/test-results/testDebugUnitTest/*.xml; do
+            grep -q "<failure" "$f" 2>/dev/null || continue
+            echo "::group::$f"
+            sed -n '/<failure/,/<\/failure>/p' "$f" | head -80
+            echo "::endgroup::"
+          done
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: informes-tests
+          path: app/build/reports/tests/
+          retention-days: 7
+
+  reportes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Tests del servicio de reportes
+        working-directory: reportes
+        run: node --test test/

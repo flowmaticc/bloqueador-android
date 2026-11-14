@@ -19,12 +19,22 @@ object DnsMessage {
 
     /** Devuelve la primera pregunta si [data] es una consulta estándar válida; si no, null. */
     fun parseQuery(data: ByteArray, offset: Int = 0, length: Int = data.size - offset): DnsQuestion? {
-        if (length < HEADER_SIZE + 5) return null
-        val limit = offset + length
+        if (offset < 0 || length < HEADER_SIZE + 5 || offset + length > data.size) return null
         val flags = u16(data, offset + 2)
         val isResponse = flags and 0x8000 != 0
         val opcode = (flags shr 11) and 0xF
         if (isResponse || opcode != 0) return null
+        return parseQuestion(data, offset, length)
+    }
+
+    /**
+     * Primera pregunta de un mensaje DNS (consulta o respuesta), o null si no la tiene o no es válida.
+     * Solo se aceptan nombres con caracteres ASCII imprimibles: es lo que usan los nombres de host
+     * reales, y evita guardar o mostrar bytes de control.
+     */
+    fun parseQuestion(data: ByteArray, offset: Int = 0, length: Int = data.size - offset): DnsQuestion? {
+        if (offset < 0 || length < HEADER_SIZE + 5 || offset + length > data.size) return null
+        val limit = offset + length
         if (u16(data, offset + 4) < 1) return null // QDCOUNT
 
         val name = StringBuilder()
@@ -39,6 +49,7 @@ object DnsMessage {
             if (name.isNotEmpty()) name.append('.')
             for (i in pos until pos + labelLen) {
                 val c = (data[i].toInt() and 0xFF).toChar()
+                if (c <= ' ' || c > '~' || c == '.') return null
                 name.append(if (c in 'A'..'Z') c + 32 else c)
             }
             if (name.length > MAX_NAME_LENGTH) return null

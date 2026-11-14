@@ -6,6 +6,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /** Una consulta tal como la ve el filtro, antes de agruparla. */
 data class DnsRecord(
@@ -27,9 +28,15 @@ class HistoryRecorder(
     private val write: suspend (List<HistoryEvent>) -> Unit,
 ) {
     private val queue = ConcurrentLinkedQueue<DnsRecord>()
+    private val queued = AtomicInteger()
     private val scheduled = AtomicBoolean(false)
 
     fun record(r: DnsRecord) {
+        // Límite de memoria ante ráfagas anómalas: lo que no cabe en el lote no se anota.
+        if (queued.incrementAndGet() > MAX_QUEUED) {
+            queued.decrementAndGet()
+            return
+        }
         queue.add(r)
         if (scheduled.compareAndSet(false, true)) {
             scope.launch {
@@ -44,6 +51,7 @@ class HistoryRecorder(
         scheduled.set(false)
         val batch = ArrayList<DnsRecord>()
         while (true) batch.add(queue.poll() ?: break)
+        queued.addAndGet(-batch.size)
         if (batch.isEmpty()) return
         try {
             write(aggregate(batch))
@@ -53,6 +61,9 @@ class HistoryRecorder(
     }
 
     companion object {
+        /** Consultas como máximo en un lote (5 s de tráfico normal son unas decenas). */
+        const val MAX_QUEUED = 10_000
+
         /** Agrupa por (dominio, app, resultado); conserva la hora de la primera y la regla. */
         fun aggregate(records: List<DnsRecord>): List<HistoryEvent> =
             records.groupBy { Triple(it.domain, it.appPackage, it.blocked) }

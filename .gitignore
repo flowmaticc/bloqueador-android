@@ -17,3 +17,7 @@ keystore.properties
 # Servicio de reportes: dependencias y caché locales de wrangler
 /reportes/node_modules/
 /reportes/.wrangler/
+
+# Registros de fallos de la JVM
+hs_err_pid*.log
+replay_pid*.log

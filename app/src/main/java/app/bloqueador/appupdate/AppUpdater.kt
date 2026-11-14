@@ -47,7 +47,7 @@ class AppUpdater(private val context: Context, private val repo: String = BuildC
         try {
             val releases = UpdateParser.parseReleases(get("${BuildConfig.UPDATE_API_BASE}/repos/$repo/releases?per_page=30"))
             val release = UpdateParser.pick(releases, channel) ?: return@withContext UpdateCheck.UpToDate
-            val info = UpdateParser.parseManifest(get(release.manifestUrl!!), release)
+            val info = UpdateParser.parseManifest(get(requireTrusted(release.manifestUrl!!)), release)
             if (info.versionCode > installedVersionCode) UpdateCheck.Available(info) else UpdateCheck.UpToDate
         } catch (e: HttpStatus) {
             UpdateCheck.Failed(
@@ -65,10 +65,11 @@ class AppUpdater(private val context: Context, private val repo: String = BuildC
         dir.mkdirs()
         dir.listFiles()?.forEach { it.delete() } // solo se guarda la última descarga
         val file = File(dir, "bloqueador-${info.versionCode}.apk")
-        val conn = open(info.apkUrl)
+        val conn = open(requireTrusted(info.apkUrl))
         try {
             if (conn.responseCode != 200) throw IOException("HTTP ${conn.responseCode}")
             val total = conn.contentLengthLong.takeIf { it > 0 }
+            if (total != null && total > MAX_APK_BYTES) throw IOException("La descarga es demasiado grande.")
             val digest = MessageDigest.getInstance("SHA-256")
             conn.inputStream.use { input ->
                 file.outputStream().use { out ->
@@ -80,6 +81,7 @@ class AppUpdater(private val context: Context, private val repo: String = BuildC
                         out.write(buf, 0, n)
                         digest.update(buf, 0, n)
                         read += n
+                        if (read > MAX_APK_BYTES) throw IOException("La descarga es demasiado grande.")
                         if (total != null) progress(read.toFloat() / total)
                     }
                 }
@@ -88,6 +90,10 @@ class AppUpdater(private val context: Context, private val repo: String = BuildC
             if (sha != info.sha256) {
                 file.delete()
                 throw IOException("La descarga no coincide con la publicada (huella distinta).")
+            }
+            if (!signedLikeThisApp(file)) {
+                file.delete()
+                throw IOException("La descarga no es de Garbillo o no está firmada con su clave.")
             }
             file
         } finally {
@@ -125,6 +131,32 @@ class AppUpdater(private val context: Context, private val repo: String = BuildC
         }
     }
 
+    /**
+     * Antes de pasarle nada al instalador: el APK tiene que ser de esta misma app y estar firmado con
+     * el mismo certificado. Android lo comprobaría igualmente al instalar; así el fallo es claro y no
+     * se llega a abrir el instalador con un fichero ajeno.
+     */
+    private fun signedLikeThisApp(apk: File): Boolean = runCatching {
+        val pm = context.packageManager
+        fun certs(info: android.content.pm.PackageInfo?): Set<String> {
+            val signatures = if (Build.VERSION.SDK_INT >= 28) {
+                info?.signingInfo?.let { if (it.hasMultipleSigners()) it.apkContentsSigners else it.signingCertificateHistory }
+            } else {
+                @Suppress("DEPRECATION") info?.signatures
+            }
+            return signatures.orEmpty().map { sig ->
+                MessageDigest.getInstance("SHA-256").digest(sig.toByteArray()).joinToString("") { "%02x".format(it) }
+            }.toSet()
+        }
+        val flag = if (Build.VERSION.SDK_INT >= 28) android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES
+        else @Suppress("DEPRECATION") android.content.pm.PackageManager.GET_SIGNATURES
+        val archive = pm.getPackageArchiveInfo(apk.path, flag) ?: return false
+        if (archive.packageName != context.packageName) return false
+        val mine = certs(pm.getPackageInfo(context.packageName, flag))
+        val theirs = certs(archive)
+        mine.isNotEmpty() && theirs.isNotEmpty() && theirs.any { it in mine }
+    }.getOrDefault(false)
+
     private class HttpStatus(val code: Int) : IOException("HTTP $code")
 
     private fun open(url: String): HttpURLConnection =
@@ -140,14 +172,45 @@ class AppUpdater(private val context: Context, private val repo: String = BuildC
         val conn = open(url)
         try {
             if (conn.responseCode != 200) throw HttpStatus(conn.responseCode)
-            return conn.inputStream.bufferedReader().use { it.readText() }
+            return conn.inputStream.use { readLimited(it, MAX_JSON_BYTES) }.toString(Charsets.UTF_8)
         } finally {
             conn.disconnect()
         }
     }
 
+    /** En la versión publicada solo se descarga por HTTPS y de GitHub. */
+    private fun requireTrusted(url: String): String {
+        if (BuildConfig.DEBUG && BuildConfig.UPDATE_API_BASE.startsWith("http://127.0.0.1")) return url
+        if (!isTrustedUrl(url)) throw IOException("Dirección de descarga no permitida.")
+        return url
+    }
+
     companion object {
         const val TAG = "AppUpdater"
+        private const val MAX_APK_BYTES = 60L * 1024 * 1024
+        private const val MAX_JSON_BYTES = 2 * 1024 * 1024
+
+        private val TRUSTED_HOSTS = listOf("github.com", "githubusercontent.com")
+
+        /** HTTPS y un dominio de GitHub (o un subdominio suyo). */
+        fun isTrustedUrl(url: String): Boolean = runCatching {
+            val u = java.net.URI(url)
+            val host = u.host?.lowercase() ?: return false
+            u.scheme == "https" && u.userInfo == null && TRUSTED_HOSTS.any { host == it || host.endsWith(".$it") }
+        }.getOrDefault(false)
+
+        /** Lee como mucho [max] bytes; si hay más, falla (protege de respuestas enormes). */
+        fun readLimited(input: java.io.InputStream, max: Int): ByteArray {
+            val out = java.io.ByteArrayOutputStream()
+            val buf = ByteArray(16 * 1024)
+            while (true) {
+                val n = input.read(buf)
+                if (n < 0) break
+                if (out.size() + n > max) throw IOException("Respuesta demasiado grande.")
+                out.write(buf, 0, n)
+            }
+            return out.toByteArray()
+        }
     }
 }
 
