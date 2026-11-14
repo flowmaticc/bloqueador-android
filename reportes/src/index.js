@@ -23,6 +23,8 @@ const MOTIVOS = {
 };
 const ORIGENES = ["app", "web"];
 const MAX_PER_DAY = 20;
+const MAX_TOTAL_PER_DAY = 500; // tope global: protege el repositorio de una avalancha
+const MAX_BODY_BYTES = 2048;
 const ALLOWED_ORIGINS = ["https://flowmaticc.github.io"];
 
 export default {
@@ -36,8 +38,13 @@ export default {
 
     let data;
     try {
-      data = await request.json();
+      const texto = await request.text();
+      if (texto.length > MAX_BODY_BYTES) return json({ ok: false, error: "datos demasiado grandes" }, 413, cors);
+      data = JSON.parse(texto);
     } catch {
+      return json({ ok: false, error: "datos no válidos" }, 400, cors);
+    }
+    if (typeof data !== "object" || data === null || Array.isArray(data)) {
       return json({ ok: false, error: "datos no válidos" }, 400, cors);
     }
 
@@ -48,7 +55,7 @@ export default {
     const motivo = Object.hasOwn(MOTIVOS, data.motivo) ? data.motivo : "otro";
     const origen = ORIGENES.includes(data.origen) ? data.origen : "web";
     const version = String(data.version || "").slice(0, 40).replace(/[^\w.\-]/g, "");
-    const nota = String(data.nota || "").replace(/[\u0000-\u001f<>]/g, " ").trim().slice(0, 300);
+    const nota = limpiarNota(data.nota);
     if (!dominio) return json({ ok: false, error: "dominio no válido" }, 400, cors);
 
     if (!(await dentroDelLimite(request, env))) {
@@ -57,7 +64,8 @@ export default {
 
     try {
       const existente = await buscarIssue(env, dominio);
-      const linea = `${MOTIVOS[motivo]} · desde la ${origen}${version ? ` (v${version})` : ""}${nota ? `\n> ${nota}` : ""}`;
+      // La nota va en un bloque de código: GitHub no la interpreta (ni menciones, ni enlaces, ni imágenes).
+      const linea = `${MOTIVOS[motivo]} · desde la ${origen}${version ? ` (v${version})` : ""}${nota ? `\n\n\`\`\`text\n${nota}\n\`\`\`` : ""}`;
       if (existente) {
         await github(env, `/repos/${env.REPO}/issues/${existente}/comments`, { body: `+1 · ${linea}` });
       } else {
@@ -75,9 +83,9 @@ export default {
 };
 
 /** Acepta una URL o un dominio y devuelve el dominio en minúsculas, o "" si no es válido. */
-function limpiarDominio(entrada) {
-  let s = entrada.trim().toLowerCase();
-  if (!s) return "";
+export function limpiarDominio(entrada) {
+  let s = String(entrada ?? "").trim().toLowerCase();
+  if (!s || s.length > 300) return "";
   try {
     if (s.includes("/") || s.includes(":")) s = new URL(s.includes("://") ? s : `https://${s}`).hostname;
   } catch {
@@ -87,16 +95,29 @@ function limpiarDominio(entrada) {
   return /^(?=.{4,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/.test(s) ? s : "";
 }
 
-/** Límite de envíos por conexión y día, con un resumen de la IP que no permite recuperarla. */
+/** Texto libre del usuario: sin caracteres de control ni nada que GitHub pueda interpretar. */
+export function limpiarNota(entrada) {
+  return String(entrada ?? "")
+    .replace(/[\u0000-\u001f\u007f<>`]/g, " ")
+    .replace(/@/g, "(a)")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 300);
+}
+
+/** Límite de envíos por conexión y día (con un resumen de la IP que no permite recuperarla) y tope global. */
 async function dentroDelLimite(request, env) {
   const ip = request.headers.get("CF-Connecting-IP") || "desconocida";
   const dia = new Date().toISOString().slice(0, 10);
+  const total = parseInt((await env.LIMITS.get(`t:${dia}`)) || "0", 10);
+  if (total >= MAX_TOTAL_PER_DAY) return false;
   const bytes = new TextEncoder().encode(`${ip}|${dia}|garbillo`);
   const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
   const clave = `l:${hash.slice(0, 32)}`;
   const actual = parseInt((await env.LIMITS.get(clave)) || "0", 10);
   if (actual >= MAX_PER_DAY) return false;
   await env.LIMITS.put(clave, String(actual + 1), { expirationTtl: 86400 });
+  await env.LIMITS.put(`t:${dia}`, String(total + 1), { expirationTtl: 172800 });
   return true;
 }
 

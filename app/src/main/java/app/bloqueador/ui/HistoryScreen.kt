@@ -269,7 +269,10 @@ private fun HistoryDetailDialog(
         },
         confirmButton = {
             Column(horizontalAlignment = Alignment.End) {
-                TextButton(onClick = onPreview) { Text("Ver en la web") }
+                // Un sitio marcado como peligroso no se abre ni en la vista previa.
+                if (!FilterEngine.isThreat(event.matchedRule)) {
+                    TextButton(onClick = onPreview) { Text("Ver en la web") }
+                }
                 TextButton(onClick = { reporting = true }) { Text("Reportar para analizar") }
                 when {
                     userAllow != null -> TextButton(onClick = {

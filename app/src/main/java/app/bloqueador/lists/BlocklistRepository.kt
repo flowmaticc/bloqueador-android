@@ -245,7 +245,19 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
                     false
                 }
                 HttpURLConnection.HTTP_OK -> {
-                    conn.inputStream.use { input -> tmp.outputStream().use { input.copyTo(it) } }
+                    conn.inputStream.use { input ->
+                        tmp.outputStream().use { out ->
+                            val buf = ByteArray(64 * 1024)
+                            var total = 0L
+                            while (true) {
+                                val n = input.read(buf)
+                                if (n < 0) break
+                                total += n
+                                if (total > MAX_LIST_BYTES) throw IOException("${source.label}: lista demasiado grande")
+                                out.write(buf, 0, n)
+                            }
+                        }
+                    }
                     val newCount = tmp.bufferedReader().useLines { BlocklistParser.parse(it).ruleCount }
                     val oldCount = prefs.getInt(countKey, 0)
                     if (newCount < MIN_RULES || newCount < oldCount / 2) {
@@ -272,6 +284,7 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
 
     private companion object {
         const val MIN_RULES = 100
+        const val MAX_LIST_BYTES = 120L * 1024 * 1024
         const val KEY_LAST_CHECK = "last_check"
         const val KEY_FAILURES = "consecutive_failures"
         const val KEY_LAST_ERROR = "last_error"

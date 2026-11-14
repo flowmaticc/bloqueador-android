@@ -238,6 +238,12 @@ private fun PreviewPage(event: HistoryEvent, url: String, onDismiss: () -> Unit)
                     this.settings.domStorageEnabled = true
                     this.settings.allowFileAccess = false
                     this.settings.allowContentAccess = false
+                    this.settings.setGeolocationEnabled(false)
+                    this.settings.setSupportMultipleWindows(false)
+                    this.settings.javaScriptCanOpenWindowsAutomatically = false
+                    this.settings.mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW
+                    this.settings.saveFormData = false
+                    if (android.os.Build.VERSION.SDK_INT >= 26) this.settings.safeBrowsingEnabled = true
                     CookieManager.getInstance().setAcceptThirdPartyCookies(this, true)
                     webView = this
                 }
@@ -322,6 +328,11 @@ private class PreviewClient(private val target: String, private val allowAll: Bo
 
     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
         val host = request.url.host ?: return null
+        // Phishing, malware o estafas: no se cargan nunca, ni siquiera en la vista previa.
+        if (BloqueadorApp.instance.engine.threats.matchRule(host) != null) {
+            otherBlocked++
+            return WebResourceResponse("text/plain", "utf-8", 403, "Bloqueado", emptyMap(), ByteArrayInputStream(ByteArray(0)))
+        }
         if (SiteGuess.matches(host, target)) {
             targetUrls.add(request.url.toString())
             return null
