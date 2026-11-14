@@ -61,4 +61,4 @@ jobs:
           node-version: "22"
       - name: Tests del servicio de reportes
         working-directory: reportes
-        run: node --test test/
+        run: npm test

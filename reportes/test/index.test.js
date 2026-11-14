@@ -1,4 +1,4 @@
-// Tests del servicio de reportes. Ejecutar: node --test reportes/test
+// Tests del servicio de reportes. Ejecutar desde reportes/: npm test
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import worker, { limpiarDominio, limpiarNota } from "../src/index.js";

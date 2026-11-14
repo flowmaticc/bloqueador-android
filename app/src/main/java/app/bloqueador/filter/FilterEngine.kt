@@ -9,18 +9,22 @@ import java.util.concurrent.atomic.AtomicLong
  * Hay dos motores: [matcher] (publicidad y rastreo) y [threats] (phishing, malware, estafas). Un
  * bloqueo por amenaza se devuelve con el prefijo [THREAT_PREFIX] para poder avisar y marcarlo.
  */
-class FilterEngine(cacheSize: Int = 2048) {
+class FilterEngine(private val cacheSize: Int = 2048) {
+
+    /**
+     * Motores y su caché van juntos y se sustituyen de una vez: una consulta que coincide con una
+     * recarga decide y guarda en la caché del mismo estado, nunca deja en la nueva un resultado viejo.
+     */
+    private class State(val filters: Filters, cacheSize: Int) {
+        /** Dominio → regla que lo bloquea, o [ALLOWED] si se permite. */
+        val cache = LruCache<String, String>(cacheSize)
+    }
 
     @Volatile
-    var matcher: DomainMatcher = DomainMatcher.EMPTY
-        private set
+    private var state = State(Filters(DomainMatcher.EMPTY), cacheSize)
 
-    @Volatile
-    var threats: DomainMatcher = DomainMatcher.EMPTY
-        private set
-
-    /** Dominio → regla que lo bloquea, o [ALLOWED] si se permite. */
-    private val cache = LruCache<String, String>(cacheSize)
+    val matcher: DomainMatcher get() = state.filters.main
+    val threats: DomainMatcher get() = state.filters.threats
 
     val queries = AtomicLong()
     val blocked = AtomicLong()
@@ -28,9 +32,7 @@ class FilterEngine(cacheSize: Int = 2048) {
     val cacheHits = AtomicLong()
 
     fun update(filters: Filters) {
-        matcher = filters.main
-        threats = filters.threats
-        cache.clear()
+        state = State(filters, cacheSize)
     }
 
     fun isBlocked(domain: String): Boolean = decide(domain) != null
@@ -38,12 +40,13 @@ class FilterEngine(cacheSize: Int = 2048) {
     /** Regla que bloquea [domain] (y cuenta la consulta), o null si se permite. */
     fun decide(domain: String): String? {
         queries.incrementAndGet()
-        val cached = cache[domain]
+        val s = state
+        val cached = s.cache[domain]
         val rule = if (cached != null) {
             cacheHits.incrementAndGet()
             cached.takeIf { it != ALLOWED }
         } else {
-            peek(domain).also { cache.put(domain, it ?: ALLOWED) }
+            peek(s.filters, domain).also { s.cache.put(domain, it ?: ALLOWED) }
         }
         if (rule != null) {
             blocked.incrementAndGet()
@@ -53,8 +56,10 @@ class FilterEngine(cacheSize: Int = 2048) {
     }
 
     /** Como [decide] pero sin caché ni contadores (para la vista previa y las comprobaciones). */
-    fun peek(domain: String): String? =
-        threats.matchRule(domain)?.let { THREAT_PREFIX + it } ?: matcher.matchRule(domain)
+    fun peek(domain: String): String? = peek(state.filters, domain)
+
+    private fun peek(f: Filters, domain: String): String? =
+        f.threats.matchRule(domain)?.let { THREAT_PREFIX + it } ?: f.main.matchRule(domain)
 
     fun resetCounters() {
         queries.set(0); blocked.set(0); threatsBlocked.set(0); cacheHits.set(0)
