@@ -52,6 +52,64 @@ de pruebas solo durante días: cada 20 min comprueba que el filtro responde y ab
 Garbillo no se exime de la optimización de batería, para comprobar que sobrevive con los ajustes de
 fábrica del móvil.
 
+## Resultados en móviles reales
+
+| Móvil | Android | Uso |
+|---|---|---|
+| Samsung Galaxy A7 (2018), batería de 3300 mAh | 10 | Móvil de pruebas, solo con wifi |
+| Google Pixel 10 | 17 | Uso diario normal |
+| Emulador | 16 (API 36) | Prueba de humo de cada cambio |
+
+### 24 horas con carga (Galaxy A7, versión 0.1.0, noviembre de 2026)
+
+Sin cable durante 24 h 30 min; cada 15 minutos, 15 consultas normales, 15 de publicidad y 3 webs reales.
+
+- 100 de 100 ciclos correctos, también de noche: filtro activo en todos, 1500/1500 consultas normales
+  resueltas y 1500/1500 de publicidad bloqueadas. Respuesta DNS media: 26 ms.
+- Consumo de Garbillo según Android: **4 mAh en 24 h** (≈0,1 % de la batería). Lo demás fue la propia
+  prueba, la radio y el reposo del móvil.
+- Una actualización desde la app a mitad de prueba cortó el filtro unos 5 segundos y volvió solo.
+
+### 46 horas de navegación intensiva (Galaxy A7, versión 0.3.0, noviembre de 2026)
+
+Sin cable durante 46 h; cada 20 minutos, comprobaciones DNS y 5 webs reales de una lista de 72
+(medios, deportes, tecnología, recetas, tiempo, ocio, compras, herramientas e internacionales), con el
+aviso de cookies aceptado y bajando por la página. Modo Equilibrado + protección contra amenazas.
+
+| Medida | Resultado |
+|---|---|
+| Consultas DNS filtradas | 28 490, de las que el 47 % se bloquearon |
+| Consultas reenviadas sin respuesta | 1 de 15 084 (0,01 %) |
+| Tiempo de respuesta del DNS real | mediana 7 ms · 90 % por debajo de 43 ms · 99 % por debajo de 173 ms |
+| Ciclos de comprobación | 111 de 111 correctos, sin cortes del filtro |
+| Dominios publicitarios conocidos en 360 cargas de webs | 601 de 648 bloqueados (92,7 %) |
+| Consumo propio de Garbillo | 8 mAh en 46 h (≈0,25 % de la batería) |
+
+Los dominios publicitarios que pasaron (redirecciones de clics de anuncios y enlaces de compra) los deja
+pasar la lista Hagezi Pro a propósito, porque bloquearlos rompe enlaces. El nivel Estricto bloquea más.
+
+### Uso diario real (Pixel 10, versión 0.1.0, noviembre de 2026)
+
+- 13 horas de uso normal: el trabajo de fondo del filtro gastó **7 mAh** (≈0,15 % de la batería);
+  con la pantalla apagada, 1,5 mAh en total.
+- El filtro siguió activo todo el tiempo, también tras reiniciar el móvil.
+
+### Pruebas de funcionamiento (Galaxy A7, versiones 0.3.0 y 0.3.1, 15/11/2026)
+
+| Prueba | Resultado |
+|---|---|
+| Publicidad y rastreo (12 dominios conocidos) | 11 bloqueados; el otro lo deja pasar la lista a propósito |
+| DNS cifrados que se saltarían el filtro (Google, Cloudflare, Quad9, Firefox) | 5 de 5 bloqueados |
+| Phishing real tomado de la lista de amenazas | 4 de 4 bloqueados y marcados como peligro |
+| Webs y servicios normales | 10 de 10 funcionan |
+| IPv6 | Se bloquea igual que IPv4 |
+| Consulta nueva (sin caché) | 70 ms de media |
+| Actualizar encima de la versión anterior | Conserva los datos; el filtro vuelve solo en 5 s |
+| Actualizar desde la propia app (Android 10) | Correcto con la 0.3.1 |
+| Reiniciar el móvil | El filtro se activa solo |
+| Apagar y encender el filtro | Correcto |
+| Quedarse sin red y recuperarla | Sin red sigue bloqueando; al volver la wifi, todo funciona en 4 s |
+
 ### Registro interno (solo compilaciones de depuración)
 
 Las compilaciones de depuración guardan en el propio móvil cada consulta
