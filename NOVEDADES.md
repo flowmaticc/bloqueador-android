@@ -1,5 +1,9 @@
 # Novedades
 
+## Próxima versión
+
+- Sin cambios todavía respecto a la 0.3.0.
+
 ## 0.3.0
 
 - **Nuevo nombre: Garbillo**, con icono propio. Se actualiza encima de la versión que tengas.
