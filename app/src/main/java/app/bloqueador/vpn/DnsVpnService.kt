@@ -277,6 +277,8 @@ class DnsVpnService : VpnService() {
                 } catch (e: Exception) {
                     Log.w(TAG, "No se pudo descargar alguna lista", e)
                     ErrorReports.record(this@DnsVpnService, "listas_descarga", e)
+                    // Sin conexión ahora: se vuelve a intentar en cuanto haya una red permitida.
+                    ListUpdateScheduler.downloadWhenAllowed(this@DnsVpnService)
                 }
             } else {
                 // "Solo con wifi" y ahora con datos móviles: lo que falte se descarga al conectar a una wifi.
