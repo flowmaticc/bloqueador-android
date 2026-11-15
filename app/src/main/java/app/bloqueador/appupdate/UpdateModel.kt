@@ -75,14 +75,23 @@ object UpdateParser {
         }
     }
 
-    /** Notas de GitHub (Markdown) a texto llano: sin `**`, `#`, ni enlaces en formato Markdown. */
-    internal fun plainText(md: String): String =
-        md.lines().joinToString("\n") { line ->
-            line.trimStart('#', ' ')
+    /**
+     * Notas de GitHub (Markdown) a texto llano: sin `**`, `#`, ni enlaces en formato Markdown. Las
+     * líneas sangradas continúan la anterior (en el Markdown se cortan solo para leerlo cómodo), así
+     * el texto ocupa el ancho de la pantalla sin saltos a mitad de frase.
+     */
+    internal fun plainText(md: String): String {
+        val out = mutableListOf<String>()
+        for (raw in md.lines()) {
+            val continuation = raw.isNotBlank() && raw.first().isWhitespace() && out.lastOrNull()?.isNotEmpty() == true
+            val line = raw.trim().trimStart('#', ' ')
                 .replace("**", "")
                 .replace(Regex("""\[([^]]*)]\(([^)]*)\)"""), "$1")
                 .replace(Regex("^[*-] "), "• ")
-        }.trim()
+            if (continuation) out[out.lastIndex] = out.last() + " " + line else out += line
+        }
+        return out.joinToString("\n").replace(Regex("\n{3,}"), "\n\n").trim()
+    }
 
     /**
      * La publicación más reciente que acepta [channel]. No se compara por versión: si alguien pasa

@@ -72,4 +72,15 @@ class PlainTextTest {
         val md = "## Novedades\n* **Rápido**: menos CPU\n**Full Changelog**: [v0.1.0](https://x)"
         assertEquals("Novedades\n• Rápido: menos CPU\nFull Changelog: v0.1.0", UpdateParser.plainText(md))
     }
+
+    @Test
+    fun `las lineas sangradas continuan la frase anterior`() {
+        val md = "Intro:\n\n- **Corregido**: si una lista no se puede descargar, el ajuste vuelve a como\n" +
+            "  estaba y se avisa.\n- Otra \"mejora\" con comillas.\n\n\n\nFin"
+        assertEquals(
+            "Intro:\n\n• Corregido: si una lista no se puede descargar, el ajuste vuelve a como estaba y se avisa.\n" +
+                "• Otra \"mejora\" con comillas.\n\nFin",
+            UpdateParser.plainText(md),
+        )
+    }
 }

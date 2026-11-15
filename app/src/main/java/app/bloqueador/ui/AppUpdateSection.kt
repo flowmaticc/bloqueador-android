@@ -121,7 +121,10 @@ fun AppUpdateSection() {
         available?.let { info ->
             Text("Nueva versión disponible: ${info.versionName}", style = MaterialTheme.typography.titleSmall)
             if (info.notes.isNotBlank()) {
-                Text(info.notes.take(600), style = MaterialTheme.typography.bodySmall)
+                // Entera; solo si fuera muy larga se corta, y siempre al final de una línea.
+                val notes = if (info.notes.length <= 2000) info.notes
+                else info.notes.take(2000).substringBeforeLast('\n') + "\n…"
+                Text(notes, style = MaterialTheme.typography.bodySmall)
             }
             Button(enabled = !busy, onClick = { install(info) }) { Text("Descargar e instalar") }
         }
