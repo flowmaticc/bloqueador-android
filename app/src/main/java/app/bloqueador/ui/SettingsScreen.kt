@@ -34,6 +34,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -140,6 +142,8 @@ private fun SettingsHome(onBack: () -> Unit, onOpen: (SettingsSection) -> Unit) 
     val settings = BloqueadorApp.instance.settings
     var query by rememberSaveable { mutableStateOf("") }
     val index = remember { settingsIndex(android.os.Build.MANUFACTURER) }
+    val focus = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
 
     Column(
         Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(16.dp),
@@ -163,7 +167,13 @@ private fun SettingsHome(onBack: () -> Unit, onOpen: (SettingsSection) -> Unit) 
                 Card(Modifier.fillMaxWidth()) {
                     results.forEachIndexed { i, e ->
                         if (i > 0) HorizontalDivider()
-                        NavRow(e.title, e.section.title) { onOpen(e.section) }
+                        NavRow(e.title, e.section.title) {
+                            // Se cierra el teclado antes de cambiar de pantalla: si no, la nueva
+                            // reserva su hueco y en algunos Android queda cortada.
+                            focus.clearFocus()
+                            keyboard?.hide()
+                            onOpen(e.section)
+                        }
                     }
                 }
             }
