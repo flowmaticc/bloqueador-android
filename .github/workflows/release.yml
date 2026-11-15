@@ -174,3 +174,36 @@ jobs:
               gh release create "$tag" out/* --title "Garbillo $tag" --notes "$notes"
               ;;
           esac
+
+      - name: Retirar los archivos de versiones antiguas
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Las publicaciones se quedan como historial con sus notas, pero solo las dos estables más
+          # recientes conservan el APK (la actual y una anterior por si hay que volver atrás). Las betas
+          # anteriores a la última estable también lo pierden. Sin update.json, la app ya no las ofrece.
+          marker="Los archivos de esta versión se han retirado"
+          gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
+            -q '.[] | select(.tag_name != "nightly" and .draft == false) | [.tag_name, .prerelease, .created_at, (.assets | length)] | @tsv' \
+            | sort -t$'\t' -k3 -r > releases.tsv
+          stables=0; latest_stable=""
+          while IFS=$'\t' read -r tag pre created assets; do
+            if [ "$pre" = "false" ]; then
+              stables=$((stables + 1))
+              [ -z "$latest_stable" ] && latest_stable="$created"
+              [ "$stables" -le 2 ] && continue
+            else
+              # Beta: se conserva si es posterior a la última estable.
+              if [ -z "$latest_stable" ] || [[ "$created" > "$latest_stable" ]]; then continue; fi
+            fi
+            [ "$assets" -eq 0 ] && continue
+            echo "Retirando los archivos de $tag"
+            gh release view "$tag" -R "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' | while read -r name; do
+              gh release delete-asset "$tag" "$name" -R "$GITHUB_REPOSITORY" --yes
+            done
+            body=$(gh release view "$tag" -R "$GITHUB_REPOSITORY" --json body -q .body)
+            if ! grep -q "$marker" <<< "$body"; then
+              gh release edit "$tag" -R "$GITHUB_REPOSITORY" --notes "$(printf '%s\n\n---\n_%s para que no se instalen versiones antiguas. Descarga la versión estable más reciente._' "$body" "$marker")"
+            fi
+          done < releases.tsv
