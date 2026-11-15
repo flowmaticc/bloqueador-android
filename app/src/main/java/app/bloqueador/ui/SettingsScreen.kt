@@ -249,8 +249,12 @@ private fun SectionScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var job by remember { mutableStateOf<Job?>(null) }
 
-    /** Descarga lo que falte (si [download]) y recarga el motor. Un cambio nuevo cancela el anterior. */
-    fun applyLists(download: Boolean) {
+    /**
+     * Descarga lo que falte (si [download]) y recarga el motor. Un cambio nuevo cancela el anterior.
+     * Si la descarga falla, [revert] deja el ajuste como estaba: así nunca se ve activada una lista
+     * que no está en el móvil.
+     */
+    fun applyLists(download: Boolean, revert: (() -> Unit)? = null) {
         job?.cancel()
         job = scope.launch {
             applying = true
@@ -262,7 +266,13 @@ private fun SectionScreen(
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
-                        error = "No se pudo descargar: ${e.message}"
+                        if (revert != null) {
+                            revert()
+                            error = "No se pudo descargar la lista. Comprueba la conexión y vuelve a intentarlo: " +
+                                "se ha dejado como estaba."
+                        } else {
+                            error = "No se pudo descargar: ${e.message}"
+                        }
                     }
                 }
                 app.reloadEngine()
@@ -286,9 +296,9 @@ private fun SectionScreen(
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
         when (section) {
-            SettingsSection.MODE -> ModeSection { applyLists(download = true) }
-            SettingsSection.SECURITY -> SecuritySection { applyLists(download = true) }
-            SettingsSection.LAYERS -> LayersSection { on -> applyLists(download = on) }
+            SettingsSection.MODE -> ModeSection { revert -> applyLists(download = true, revert) }
+            SettingsSection.SECURITY -> SecuritySection { revert -> applyLists(download = true, revert) }
+            SettingsSection.LAYERS -> LayersSection { on, revert -> applyLists(download = on, revert.takeIf { on }) }
             SettingsSection.APPS -> AppsSection(onChangeStrategy, onEditApps)
             SettingsSection.RULES -> RulesSection { applyLists(download = false) }
             SettingsSection.LIST_UPDATES -> ListUpdatesSection()
@@ -302,7 +312,7 @@ private fun SectionScreen(
 }
 
 @Composable
-private fun ModeSection(onChanged: () -> Unit) {
+private fun ModeSection(onChanged: (revert: () -> Unit) -> Unit) {
     val settings = BloqueadorApp.instance.settings
     var mode by remember { mutableStateOf(settings.mode) }
     SectionCard("¿Cuánto quieres bloquear?") {
@@ -313,9 +323,13 @@ private fun ModeSection(onChanged: () -> Unit) {
                 description = m.description,
                 onClick = {
                     if (m != mode) {
+                        val previous = mode
                         mode = m
                         settings.mode = m
-                        onChanged()
+                        onChanged {
+                            mode = previous
+                            settings.mode = previous
+                        }
                     }
                 },
             )
@@ -324,7 +338,7 @@ private fun ModeSection(onChanged: () -> Unit) {
 }
 
 @Composable
-private fun SecuritySection(onChanged: () -> Unit) {
+private fun SecuritySection(onChanged: (revert: () -> Unit) -> Unit) {
     val app = BloqueadorApp.instance
     val settings = app.settings
     var enabled by remember { mutableStateOf(settings.threatProtection) }
@@ -346,7 +360,13 @@ private fun SecuritySection(onChanged: () -> Unit) {
         ) { on ->
             enabled = on
             settings.threatProtection = on
-            onChanged()
+            onChanged {
+                // Solo se deshace al activarla (desactivar no descarga nada).
+                if (on) {
+                    enabled = false
+                    settings.threatProtection = false
+                }
+            }
         }
         if (enabled) {
             blockedRecently?.let { n ->
@@ -367,9 +387,13 @@ private fun SecuritySection(onChanged: () -> Unit) {
                     description = l.description,
                 ) {
                     if (l != level) {
+                        val previous = level
                         level = l
                         settings.threatLevel = l
-                        onChanged()
+                        onChanged {
+                            level = previous
+                            settings.threatLevel = previous
+                        }
                     }
                 }
             }
@@ -403,7 +427,7 @@ private fun SecuritySection(onChanged: () -> Unit) {
 }
 
 @Composable
-private fun LayersSection(onChanged: (on: Boolean) -> Unit) {
+private fun LayersSection(onChanged: (on: Boolean, revert: () -> Unit) -> Unit) {
     val settings = BloqueadorApp.instance.settings
     var layers by remember { mutableStateOf(settings.layers) }
     Text(
@@ -420,7 +444,10 @@ private fun LayersSection(onChanged: (on: Boolean) -> Unit) {
             ) { on ->
                 layers = if (on) layers + layer.id else layers - layer.id
                 settings.layers = layers
-                onChanged(on)
+                onChanged(on) {
+                    layers = settings.layers - layer.id
+                    settings.layers = layers
+                }
             }
         }
     }

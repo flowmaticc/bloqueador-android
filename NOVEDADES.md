@@ -2,7 +2,10 @@
 
 ## Próxima versión
 
-- Sin cambios todavía respecto a la 0.3.1.
+- Corregido: si una lista no se puede descargar (por ejemplo, sin conexión), el ajuste vuelve a como
+  estaba y se avisa, en vez de quedarse marcado sin funcionar.
+- Corregido: cambiar de nivel de bloqueo sin conexión podía dejar el móvil sin ninguna lista; ahora la
+  lista anterior se conserva hasta que la nueva se descarga bien.
 
 ## 0.3.1
 

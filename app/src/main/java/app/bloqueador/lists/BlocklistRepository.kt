@@ -165,11 +165,13 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
 
     /** Descarga solo las listas activas que todavía no están en disco. @return true si bajó alguna. */
     suspend fun downloadMissing(): Boolean {
-        pruneUnused()
         var changed = false
         for (source in activeSources()) {
             if (!fileFor(source).isFile && download(source)) changed = true
         }
+        // Solo tras descargar bien lo nuevo: si falla (sin conexión), las listas anteriores siguen en el
+        // móvil y el ajuste se puede deshacer sin quedarse sin filtro.
+        pruneUnused()
         return changed
     }
 
