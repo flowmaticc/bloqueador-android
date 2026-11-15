@@ -2,6 +2,10 @@
 
 ## Próxima versión
 
+- Sin cambios todavía respecto a la 0.3.1.
+
+## 0.3.1
+
 - **Corregido: en Android 9 y 10 las actualizaciones desde la app fallaban** con el aviso "La descarga
   no es de Garbillo". Si tienes la 0.3.0 en uno de esos Android, instala esta versión una vez a mano
   desde la web; a partir de ahí se actualiza sola.
