@@ -59,7 +59,7 @@ class FilterEngine(private val cacheSize: Int = 2048) {
     fun peek(domain: String): String? = peek(state.filters, domain)
 
     private fun peek(f: Filters, domain: String): String? =
-        f.threats.matchRule(domain)?.let { THREAT_PREFIX + it } ?: f.main.matchRule(domain)
+        f.threats.matchRule(domain, alwaysBlocked = false)?.let { THREAT_PREFIX + it } ?: f.main.matchRule(domain)
 
     fun resetCounters() {
         queries.set(0); blocked.set(0); threatsBlocked.set(0); cacheHits.set(0)

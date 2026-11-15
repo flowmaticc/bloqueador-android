@@ -22,11 +22,12 @@ class DomainMatcher(
 
     /**
      * Regla que bloquea [domain], escrita como en las listas (`||ads.com^` o `ads.com`),
-     * o null si el dominio se permite.
+     * o null si el dominio se permite. Con [alwaysBlocked] = false no se aplican las reglas
+     * internas de [ALWAYS_BLOCKED] (el motor de amenazas solo marca lo que está en su lista).
      */
-    fun matchRule(domain: String): String? {
+    fun matchRule(domain: String, alwaysBlocked: Boolean = true): String? {
         if (findSuffix(domain, allowSuffix) >= 0) return null
-        if (domain in ALWAYS_BLOCKED) return "||$domain^"
+        if (alwaysBlocked && domain in ALWAYS_BLOCKED) return "||$domain^"
         if (domain in exact) return domain
         val at = findSuffix(domain, suffix)
         return if (at >= 0) "||${domain.substring(at)}^" else null

@@ -67,6 +67,19 @@ class FilterTest {
     }
 
     @Test
+    fun `el canario de Firefox se bloquea pero no se marca como amenaza`() {
+        val threats = BlocklistParser.parse(sequenceOf("||phishing.example^")).build()
+        for (t in listOf(threats, DomainMatcher.EMPTY)) { // con y sin protección contra amenazas
+            val engine = FilterEngine()
+            engine.update(FilterEngine.Filters(matcher, t))
+            val rule = engine.decide("use-application-dns.net")
+            assertEquals("||use-application-dns.net^", rule)
+            assertFalse(FilterEngine.isThreat(rule))
+            assertEquals(0, engine.threatsBlocked.get())
+        }
+    }
+
+    @Test
     fun `normalize limpia y valida`() {
         assertEquals("a.b.com", BlocklistParser.normalize("A.B.COM."))
         assertNull(BlocklistParser.normalize("a..com"))

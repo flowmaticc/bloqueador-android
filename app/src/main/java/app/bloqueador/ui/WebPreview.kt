@@ -329,7 +329,7 @@ private class PreviewClient(private val target: String, private val allowAll: Bo
     override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
         val host = request.url.host ?: return null
         // Phishing, malware o estafas: no se cargan nunca, ni siquiera en la vista previa.
-        if (BloqueadorApp.instance.engine.threats.matchRule(host) != null) {
+        if (BloqueadorApp.instance.engine.threats.matchRule(host, alwaysBlocked = false) != null) {
             otherBlocked++
             return WebResourceResponse("text/plain", "utf-8", 403, "Bloqueado", emptyMap(), ByteArrayInputStream(ByteArray(0)))
         }
