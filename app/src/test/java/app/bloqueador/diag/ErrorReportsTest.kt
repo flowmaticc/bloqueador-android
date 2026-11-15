@@ -49,7 +49,7 @@ class ErrorReportsTest {
     }
 
     @Test
-    fun `detalle de descarga: solo el codigo HTTP o sin conexion`() {
+    fun `el detalle de una descarga es solo el codigo HTTP o sin conexion`() {
         assertEquals("HTTP 404", ErrorReports.downloadDetail("Hagezi Pro: HTTP 404 en https://x/y"))
         assertEquals("sin_conexion", ErrorReports.downloadDetail("Unable to resolve host \"raw.githubusercontent.com\""))
         assertEquals("sin_conexion", ErrorReports.downloadDetail(null))
