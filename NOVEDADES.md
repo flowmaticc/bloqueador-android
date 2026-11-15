@@ -2,6 +2,10 @@
 
 ## Próxima versión
 
+- **Corregido: en Android 9 y 10 las actualizaciones desde la app fallaban** con el aviso "La descarga
+  no es de Garbillo". Si tienes la 0.3.0 en uno de esos Android, instala esta versión una vez a mano
+  desde la web; a partir de ahí se actualiza sola.
+- Corregido: en Ajustes, una sección abierta desde el buscador podía verse cortada.
 - **Historial más privado**: al borrarlo no quedan restos en el archivo del móvil, y lo antiguo se
   borra a su tiempo aunque el filtro lleve días apagado.
 

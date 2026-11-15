@@ -138,24 +138,36 @@ class AppUpdater(private val context: Context, private val repo: String = BuildC
      */
     private fun signedLikeThisApp(apk: File): Boolean = runCatching {
         val pm = context.packageManager
-        fun certs(info: android.content.pm.PackageInfo?): Set<String> {
-            val signatures = if (Build.VERSION.SDK_INT >= 28) {
-                info?.signingInfo?.let { if (it.hasMultipleSigners()) it.apkContentsSigners else it.signingCertificateHistory }
-            } else {
-                @Suppress("DEPRECATION") info?.signatures
-            }
-            return signatures.orEmpty().map { sig ->
-                MessageDigest.getInstance("SHA-256").digest(sig.toByteArray()).joinToString("") { "%02x".format(it) }
-            }.toSet()
-        }
-        val flag = if (Build.VERSION.SDK_INT >= 28) android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES
-        else @Suppress("DEPRECATION") android.content.pm.PackageManager.GET_SIGNATURES
-        val archive = pm.getPackageArchiveInfo(apk.path, flag) ?: return false
+        val archive = pm.getPackageArchiveInfo(apk.path, 0) ?: return false
         if (archive.packageName != context.packageName) return false
-        val mine = certs(pm.getPackageInfo(context.packageName, flag))
-        val theirs = certs(archive)
-        mine.isNotEmpty() && theirs.isNotEmpty() && theirs.any { it in mine }
+        val mine = certificates { pm.getPackageInfo(context.packageName, it) }
+        val theirs = certificates { pm.getPackageArchiveInfo(apk.path, it) }
+        // En algunas versiones de Android (9 y 10) no se puede leer la firma de un APK sin instalar.
+        // En ese caso decide el instalador de Android, que rechaza cualquier APK firmado con otra clave.
+        if (mine.isEmpty() || theirs.isEmpty()) return true
+        theirs.any { it in mine }
     }.getOrDefault(false)
+
+    /**
+     * Huellas SHA-256 de los certificados de firma. Prueba primero la API moderna y, si no devuelve
+     * nada (pasa con APK sin instalar en Android 9 y 10), la antigua.
+     */
+    private fun certificates(load: (Int) -> android.content.pm.PackageInfo?): Set<String> {
+        fun digest(sigs: Array<android.content.pm.Signature>?): Set<String> = sigs.orEmpty().map { sig ->
+            MessageDigest.getInstance("SHA-256").digest(sig.toByteArray()).joinToString("") { "%02x".format(it) }
+        }.toSet()
+        if (Build.VERSION.SDK_INT >= 28) {
+            val info = runCatching { load(android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES) }.getOrNull()
+            val modern = digest(info?.signingInfo?.let {
+                if (it.hasMultipleSigners()) it.apkContentsSigners else it.signingCertificateHistory
+            })
+            if (modern.isNotEmpty()) return modern
+        }
+        @Suppress("DEPRECATION")
+        val info = runCatching { load(android.content.pm.PackageManager.GET_SIGNATURES) }.getOrNull()
+        @Suppress("DEPRECATION")
+        return digest(info?.signatures)
+    }
 
     private class HttpStatus(val code: Int) : IOException("HTTP $code")
 
