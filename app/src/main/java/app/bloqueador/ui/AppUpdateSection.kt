@@ -82,7 +82,9 @@ fun AppUpdateSection() {
             status = try {
                 val apk = updater.download(info) { progress = it }
                 updater.install(apk)
-                "Instalando… Android te pedirá confirmación."
+                "Instalando… Android te pedirá confirmación. Si Google Play Protect la bloquea o avisa de " +
+                    "que la app es desconocida, pulsa \"Más detalles\" → \"Instalar de todas formas\": sale " +
+                    "porque Garbillo no está en Google Play."
             } catch (e: Exception) {
                 "No se pudo actualizar: ${e.message}"
             }

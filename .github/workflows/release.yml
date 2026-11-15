@@ -56,6 +56,14 @@ jobs:
             fi
           else
             tag=nightly
+            # La nightly lleva el número de la versión siguiente a la última estable publicada: si
+            # gradle.properties no va por delante, se usa la siguiente corrección (0.3.2 → 0.3.3).
+            last=$(gh release list -R "$GITHUB_REPOSITORY" --exclude-pre-releases --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null)
+            last="${last#v}"
+            if [ -n "$last" ] && [ "$(printf '%s\n%s\n' "$base" "$last" | sort -V | tail -1)" = "$last" ]; then
+              IFS=. read -r ma mi pa <<< "$last"
+              base="$ma.$mi.$((pa + 1))"
+            fi
             name="${base}-nightly.$(date -u +%Y%m%d).${GITHUB_SHA::7}"
             channel=nightly
           fi

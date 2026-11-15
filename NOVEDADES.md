@@ -2,7 +2,9 @@
 
 ## Próxima versión
 
-- Sin cambios todavía respecto a la 0.3.2.
+- Al actualizar desde la app, se explica qué hacer si Google Play Protect bloquea la instalación.
+- Las versiones de desarrollo (Nightly) se numeran siempre por delante de la última estable, para que
+  no parezca que una actualización baja de versión.
 
 ## 0.3.2
 
