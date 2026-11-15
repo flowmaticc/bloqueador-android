@@ -130,19 +130,26 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="${{ steps.version.outputs.tag }}"
+          # Las notas salen de NOVEDADES.md: la sección de la versión ("## 0.3.0") o, para nightly y
+          # beta sin sección propia, "## Próxima versión".
+          section() { awk -v h="## $1" '$0==h{f=1;next} /^## /{f=0} f' NOVEDADES.md; }
+          base="${tag#v}"; base="${base%%-*}"
+          notes="$(section "$base")"
+          [ -n "$notes" ] || notes="$(section "Próxima versión")"
           case "${{ steps.version.outputs.channel }}" in
             nightly)
               gh release delete nightly --cleanup-tag --yes || true
-              notes="Versión de desarrollo generada automáticamente a partir de ${GITHUB_SHA::7}.
-
-          $(git log -1 --pretty=%B)"
               gh release create nightly out/* --prerelease --target "$GITHUB_SHA" \
-                --title "Nightly ${{ steps.version.outputs.name }}" --notes "$notes"
+                --title "Nightly ${{ steps.version.outputs.name }}" \
+                --notes "$(printf 'Versión de desarrollo, con lo que llegará en la próxima versión:\n%s' "$notes")"
               ;;
             beta)
-              gh release create "$tag" out/* --prerelease --title "Beta $tag" --generate-notes
+              gh release create "$tag" out/* --prerelease --title "Garbillo $tag (beta)" --notes "$notes"
               ;;
             stable)
-              gh release create "$tag" out/* --title "Bloqueador $tag" --generate-notes
+              if [ -z "$(section "$base")" ]; then
+                echo "::error::Falta la sección '## $base' en NOVEDADES.md"; exit 1
+              fi
+              gh release create "$tag" out/* --title "Garbillo $tag" --notes "$notes"
               ;;
           esac
