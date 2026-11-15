@@ -1,6 +1,6 @@
 # Novedades
 
-## Próxima versión
+## 0.3.0
 
 - **Nuevo nombre: Garbillo**, con icono propio. Se actualiza encima de la versión que tengas.
 - **Protección contra amenazas**, activada de serie: bloquea webs de phishing, malware y estafas, avisa
