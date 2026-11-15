@@ -91,6 +91,19 @@ class AppSettings(context: Context) {
             ?: UpdateFrequency.EVERY_12H
         set(v) = prefs.edit().putString("update_frequency", v.name).apply()
 
+    /**
+     * Las descargas automáticas (listas, comprobar versiones nuevas, informes de errores) solo con wifi
+     * u otra red sin límite de datos. Lo que el usuario pide a mano se descarga siempre.
+     */
+    var downloadsWifiOnly: Boolean
+        get() = prefs.getBoolean("downloads_wifi_only", true)
+        set(v) = prefs.edit().putBoolean("downloads_wifi_only", v).apply()
+
+    /** Informes de errores anónimos: true/false según eligió el usuario; null = aún no se le ha preguntado. */
+    var errorReports: Boolean?
+        get() = if (prefs.contains("error_reports")) prefs.getBoolean("error_reports", false) else null
+        set(v) = prefs.edit().apply { if (v == null) remove("error_reports") else putBoolean("error_reports", v) }.apply()
+
     /** El usuario quiere el filtro encendido (para reactivarlo tras actualizar la app). */
     var filterWanted: Boolean
         get() = prefs.getBoolean("filter_wanted", false)

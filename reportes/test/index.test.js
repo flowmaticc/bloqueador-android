@@ -1,7 +1,7 @@
 // Tests del servicio de reportes. Ejecutar desde reportes/: npm test
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import worker, { limpiarDominio, limpiarNota } from "../src/index.js";
+import worker, { limpiarDominio, limpiarNota, limpiarInforme, limpiarCampo, firmaDeError } from "../src/index.js";
 
 /** Entorno falso: almacén KV en memoria y GitHub simulado (se sustituye fetch). */
 function entorno({ issuesAbiertas = [] } = {}) {
@@ -110,4 +110,74 @@ test("si GitHub falla, responde 502 sin detalles internos", async () => {
   const r = await worker.fetch(post({ dominio: "ejemplo.com" }), env);
   assert.equal(r.status, 502);
   assert.ok(!(await r.text()).includes("secreto"));
+});
+
+// --- Informes de errores anónimos ---
+
+const informe = (extra = {}) => ({
+  version: "0.3.3-nightly.20261115.abc1234",
+  canal: "nightly",
+  android: 33,
+  fabricante: "xiaomi",
+  nivel: "balanced",
+  listas_extra: 6,
+  amenazas: true,
+  errores: [{ tipo: "listas_descarga", detalle: "HTTP 404", traza: ["clase java.io.IOException", "lists.BlocklistRepository.download:120"], veces: 3, primer_dia: "2026-11-14", ultimo_dia: "2026-11-15" }],
+  ...extra,
+});
+
+const postError = (body, ip = "203.0.113.7") =>
+  new Request("https://servicio/error", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "CF-Connecting-IP": ip },
+    body: typeof body === "string" ? body : JSON.stringify(body),
+  });
+
+test("limpiarInforme solo deja campos conocidos con formato cerrado", () => {
+  const i = limpiarInforme(informe({ email: "ana@example.com", canal: "otro", nivel: "<script>" }));
+  assert.equal(i.email, undefined);
+  assert.equal(i.canal, "");
+  assert.equal(i.nivel, "");
+  assert.equal(limpiarInforme(informe({ android: "33" })), null, "android debe ser un número");
+  assert.equal(limpiarInforme(informe({ errores: [] })), null);
+  assert.equal(limpiarInforme(informe({ errores: [{ tipo: "Tipo Raro!" }] })), null);
+  assert.equal(limpiarCampo('a"b`c<d>e\n@f'), "abc<d>ef");
+  const muchos = limpiarInforme(informe({ errores: Array.from({ length: 50 }, (_, n) => ({ tipo: "cierre", detalle: `d${n}` })) }));
+  assert.equal(muchos.errores.length, 10);
+});
+
+test("la firma agrupa el mismo error aunque cambien la versión o las veces", async () => {
+  const a = limpiarInforme(informe()).errores[0];
+  const b = limpiarInforme(informe({ version: "0.4.0" })).errores[0];
+  assert.equal(await firmaDeError(a), await firmaDeError({ ...b, veces: 99 }));
+  assert.notEqual(await firmaDeError(a), await firmaDeError({ ...a, detalle: "HTTP 500" }));
+});
+
+test("un informe nuevo crea una incidencia con etiqueta error y todo en bloques de código", async () => {
+  const { env, llamadas } = entorno();
+  const r = await worker.fetch(postError(informe()), env);
+  assert.equal(r.status, 200);
+  const crear = llamadas.find((l) => l.method === "POST" && l.url.endsWith("/repos/org/repo/issues"));
+  assert.match(crear.body.title, /^Error: listas_descarga · [0-9a-f]{10}$/);
+  assert.deepEqual(crear.body.labels, ["error"]);
+  assert.ok(crear.body.body.includes("```text\nclase java.io.IOException\nlists.BlocklistRepository.download:120\n```"));
+  assert.ok(crear.body.body.includes("Android API 33 · xiaomi"));
+});
+
+test("si el error ya está abierto se añade un comentario", async () => {
+  const titulo = `Error: listas_descarga · ${await firmaDeError(limpiarInforme(informe()).errores[0])}`;
+  const { env, llamadas } = entorno({ issuesAbiertas: [{ title: titulo, number: 12 }] });
+  await worker.fetch(postError(informe()), env);
+  assert.ok(llamadas.some((l) => l.url.endsWith("/issues/12/comments")));
+  assert.ok(!llamadas.some((l) => l.method === "POST" && l.url.endsWith("/repos/org/repo/issues")));
+});
+
+test("informes no válidos, enormes o en exceso no llegan a GitHub", async () => {
+  const { env, llamadas } = entorno();
+  assert.equal((await worker.fetch(postError("{roto"), env)).status, 400);
+  assert.equal((await worker.fetch(postError(informe({ android: "x" })), env)).status, 400);
+  assert.equal((await worker.fetch(postError(JSON.stringify(informe({ relleno: "x".repeat(9000) }))), env)).status, 413);
+  assert.equal(llamadas.length, 0);
+  for (let i = 0; i < 5; i++) assert.equal((await worker.fetch(postError(informe(), "198.51.100.1"), env)).status, 200);
+  assert.equal((await worker.fetch(postError(informe(), "198.51.100.1"), env)).status, 429);
 });

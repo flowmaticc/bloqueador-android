@@ -16,13 +16,15 @@ import androidx.work.BackoffPolicy
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.NetworkType
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import app.bloqueador.BloqueadorApp
 import app.bloqueador.R
 import app.bloqueador.VpnState
+import app.bloqueador.diag.ErrorReports
 import app.bloqueador.settings.UpdateFrequency
 import app.bloqueador.ui.MainActivity
 import java.util.concurrent.TimeUnit
@@ -31,12 +33,13 @@ import java.util.concurrent.TimeUnit
 object ListUpdateScheduler {
     private const val WORK_NAME = "list-update"
 
+    private const val FIRST_DOWNLOAD = "list-first-download"
+
     /**
-     * Programa (o cancela, si es manual) la tarea periódica.
-     * @param replace true cuando el usuario cambia la frecuencia: se aplica el nuevo intervalo.
-     *   false al arrancar la app: se respeta la programación existente para no reiniciar el reloj.
+     * Programa (o cancela, si es manual) la tarea periódica, con la red que pide [DownloadPolicy].
+     * Si ya existía se actualiza sin reiniciar su reloj (así también se aplica un cambio de ajustes).
      */
-    fun schedule(context: Context, frequency: UpdateFrequency, replace: Boolean) {
+    fun schedule(context: Context, frequency: UpdateFrequency) {
         val wm = WorkManager.getInstance(context)
         if (frequency.hours == 0L) {
             wm.cancelUniqueWork(WORK_NAME)
@@ -45,7 +48,7 @@ object ListUpdateScheduler {
         val request = PeriodicWorkRequestBuilder<ListUpdateWorker>(frequency.hours, TimeUnit.HOURS)
             .setConstraints(
                 Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .setRequiredNetworkType(DownloadPolicy.networkType())
                     .setRequiresBatteryNotLow(true)
                     .build()
             )
@@ -53,11 +56,19 @@ object ListUpdateScheduler {
             .setInitialDelay(1, TimeUnit.HOURS)
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.MINUTES)
             .build()
-        wm.enqueueUniquePeriodicWork(
-            WORK_NAME,
-            if (replace) ExistingPeriodicWorkPolicy.UPDATE else ExistingPeriodicWorkPolicy.KEEP,
-            request,
-        )
+        wm.enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
+    }
+
+    /**
+     * Descarga lo que falte en cuanto haya una red permitida (p. ej. al activar el filtro con datos
+     * móviles y "solo con wifi": se lanza sola al conectar a una wifi).
+     */
+    fun downloadWhenAllowed(context: Context) {
+        val request = OneTimeWorkRequestBuilder<ListUpdateWorker>()
+            .setConstraints(Constraints.Builder().setRequiredNetworkType(DownloadPolicy.networkType()).build())
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.MINUTES)
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(FIRST_DOWNLOAD, ExistingWorkPolicy.REPLACE, request)
     }
 }
 
@@ -93,6 +104,10 @@ class ListUpdateWorker(context: Context, params: WorkerParameters) : CoroutineWo
         // Un par de reintentos cercanos (con espera creciente) por si era un corte puntual.
         if (runAttemptCount < MAX_RETRIES) return Result.retry()
         app.repository.recordCheck(result)
+        ErrorReports.record(
+            applicationContext, "listas_actualizacion",
+            detalle = ErrorReports.downloadDetail(result.errors.firstOrNull()),
+        )
         if (shouldNotify(app.repository.consecutiveFailures)) {
             UpdateNotifier.notifyFailure(applicationContext)
         }

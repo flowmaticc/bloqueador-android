@@ -47,8 +47,8 @@ class BloqueadorApp : Application() {
         repository = BlocklistRepository(this, settings)
         history = HistoryRepository(this, settings)
         removeVisualBlockLeftovers()
-        ListUpdateScheduler.schedule(this, settings.updateFrequency, replace = false)
-        AppUpdateWorker.schedule(this)
+        app.bloqueador.diag.ErrorReports.install(this)
+        app.bloqueador.update.DownloadPolicy.reschedule(this)
     }
 
     /** Borra datos que dejaban versiones anteriores con bloqueo visual (reglas y miniaturas). */

@@ -2,6 +2,14 @@
 
 ## Próxima versión
 
+- **Bienvenida nueva**: ayuda a dejar listo lo que hace que el filtro funcione siempre (notificaciones,
+  batería e inicio automático) y te deja elegir cómo descargar y si quieres enviar informes de errores.
+- **Descargar solo con wifi** (activado por defecto): las listas y las comprobaciones de versiones se
+  descargan solas en cuanto te conectas a una wifi. Si pulsas "Actualizar ahora" con datos móviles, te
+  lo pregunta antes.
+- **Informes de errores anónimos, opcionales**: si los activas, cuando algo falla se envía un aviso sin
+  webs, historial, apps ni identificadores. Puedes ver el informe exacto antes de que salga en
+  Ajustes → Informes de errores.
 - Al actualizar desde la app, se explica qué hacer si Google Play Protect bloquea la instalación.
 - Las versiones de desarrollo (Nightly) se numeran siempre por delante de la última estable, para que
   no parezca que una actualización baja de versión.

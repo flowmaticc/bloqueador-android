@@ -16,6 +16,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import app.bloqueador.BloqueadorApp
 import app.bloqueador.R
+import app.bloqueador.diag.ErrorReports
 import app.bloqueador.ui.MainActivity
 
 /**
@@ -36,6 +37,7 @@ class BootReceiver : BroadcastReceiver() {
         runCatching { DnsVpnService.start(context) }
             .onFailure {
                 Log.w(TAG, "No se pudo activar el filtro al encender el móvil", it)
+                ErrorReports.record(context, "arranque_bloqueado", it)
                 notifyNotStarted(context)
             }
     }

@@ -71,6 +71,7 @@ enum class SettingsSection(val title: String, val group: String) {
     HISTORY("Historial", "Funcionamiento"),
     BATTERY("Batería y arranque", "Funcionamiento"),
     APP_UPDATES("Actualizaciones de la app", "Aplicación"),
+    ERROR_REPORTS("Informes de errores", "Aplicación"),
     HELP("Qué puede y qué no puede bloquear", "Aplicación"),
     ABOUT("Acerca de", "Aplicación"),
 }
@@ -93,6 +94,8 @@ fun settingsIndex(manufacturer: String?): List<SettingEntry> = buildList {
     add(SettingEntry(SettingsSection.RULES, "Bloquear siempre un dominio", "bloqueos propios lista negra blacklist"))
     add(SettingEntry(SettingsSection.LIST_UPDATES, "Frecuencia de actualización de listas", "12 24 horas manual automatica descargar"))
     add(SettingEntry(SettingsSection.LIST_UPDATES, "Comprobar listas ahora", "actualizar descargar ya"))
+    add(SettingEntry(SettingsSection.LIST_UPDATES, "Descargar solo con wifi", "wifi datos moviles red medida consumo descargas tarifa"))
+    add(SettingEntry(SettingsSection.ERROR_REPORTS, "Informes de errores", "fallos errores cierres crash informe anonimo diagnostico ayudar mejorar enviar privacidad"))
     add(SettingEntry(SettingsSection.HISTORY, "Guardar historial", "registro consultas activar desactivar"))
     add(SettingEntry(SettingsSection.HISTORY, "Tiempo que se conserva el historial", "conservar retencion 1 3 6 24 horas"))
     add(SettingEntry(SettingsSection.HISTORY, "Borrar historial", "eliminar limpiar"))
@@ -230,6 +233,11 @@ private fun sectionSummary(s: SettingsSection, settings: AppSettings): String {
         SettingsSection.HISTORY -> if (settings.historyEnabled) "Activado · ${settings.historyRetention.label}" else "Desactivado"
         SettingsSection.BATTERY -> "Ahorro de batería y VPN siempre activa"
         SettingsSection.APP_UPDATES -> "${settings.updateChannel.label} · versión ${BuildConfig.VERSION_NAME}"
+        SettingsSection.ERROR_REPORTS -> when (settings.errorReports) {
+            true -> "Activados · anónimos"
+            false -> "Desactivados"
+            null -> "Sin decidir"
+        }
         SettingsSection.HELP -> "YouTube, redes sociales, huecos en webs…"
         SettingsSection.ABOUT -> "Versión, licencia y código fuente"
     }
@@ -305,6 +313,7 @@ private fun SectionScreen(
             SettingsSection.HISTORY -> HistorySection()
             SettingsSection.BATTERY -> BatterySection()
             SettingsSection.APP_UPDATES -> AppUpdateSection()
+            SettingsSection.ERROR_REPORTS -> ErrorReportsSection()
             SettingsSection.HELP -> HelpSection()
             SettingsSection.ABOUT -> AboutSection()
         }
@@ -525,7 +534,7 @@ private fun ListUpdatesSection() {
                 if (f != frequency) {
                     frequency = f
                     settings.updateFrequency = f
-                    ListUpdateScheduler.schedule(context, f, replace = true)
+                    ListUpdateScheduler.schedule(context, f)
                 }
             }
         }
@@ -533,6 +542,20 @@ private fun ListUpdatesSection() {
             "Solo se descarga algo si la lista ha cambiado, y nunca con la batería baja.",
             style = MaterialTheme.typography.bodySmall,
         )
+    }
+    var wifiOnly by remember { mutableStateOf(settings.downloadsWifiOnly) }
+    SectionCard("Red") {
+        SwitchRow(
+            title = "Descargar solo con wifi",
+            description = "Las descargas automáticas (listas, versiones nuevas e informes de errores) esperan a una " +
+                "wifi y se hacen solas en cuanto te conectas. Las listas ocupan entre 5 y 40 MB según las que " +
+                "actives. Lo que pidas a mano (\"Actualizar ahora\") se descarga siempre.",
+            checked = wifiOnly,
+        ) { on ->
+            wifiOnly = on
+            settings.downloadsWifiOnly = on
+            app.bloqueador.update.DownloadPolicy.reschedule(context)
+        }
     }
     SectionCard("Estado") {
         Text(
@@ -716,7 +739,7 @@ private const val WEB_URL = "https://flowmaticc.github.io/utilities/bloqueador-a
 
 /** Fila con título, descripción e interruptor; toda la fila cambia el interruptor. */
 @Composable
-private fun SwitchRow(title: String, description: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+internal fun SwitchRow(title: String, description: String, checked: Boolean, onChange: (Boolean) -> Unit) {
     Row(
         Modifier.fillMaxWidth().clickable { onChange(!checked) }.padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,

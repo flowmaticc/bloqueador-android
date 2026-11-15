@@ -34,6 +34,7 @@ export default {
 
     const url = new URL(request.url);
     if (request.method === "GET" && url.pathname === "/") return json({ ok: true, servicio: "reportes de Garbillo" }, 200, cors);
+    if (request.method === "POST" && url.pathname === "/error") return recibirInformeDeErrores(request, env, cors);
     if (request.method !== "POST" || url.pathname !== "/reportar") return json({ ok: false, error: "no encontrado" }, 404, cors);
 
     let data;
@@ -105,27 +106,132 @@ export function limpiarNota(entrada) {
     .slice(0, 300);
 }
 
-/** Límite de envíos por conexión y día (con un resumen de la IP que no permite recuperarla) y tope global. */
-async function dentroDelLimite(request, env) {
+/**
+ * Límite de envíos por conexión y día (con un resumen de la IP que no permite recuperarla) y tope global.
+ * [prefijo] separa los contadores de reportes y de informes de errores.
+ */
+async function dentroDelLimite(request, env, { prefijo = "", maxPorConexion = MAX_PER_DAY, maxTotal = MAX_TOTAL_PER_DAY } = {}) {
   const ip = request.headers.get("CF-Connecting-IP") || "desconocida";
   const dia = new Date().toISOString().slice(0, 10);
-  const total = parseInt((await env.LIMITS.get(`t:${dia}`)) || "0", 10);
-  if (total >= MAX_TOTAL_PER_DAY) return false;
+  const claveTotal = `${prefijo}t:${dia}`;
+  const total = parseInt((await env.LIMITS.get(claveTotal)) || "0", 10);
+  if (total >= maxTotal) return false;
   const bytes = new TextEncoder().encode(`${ip}|${dia}|garbillo`);
   const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
-  const clave = `l:${hash.slice(0, 32)}`;
+  const clave = `${prefijo}l:${hash.slice(0, 32)}`;
   const actual = parseInt((await env.LIMITS.get(clave)) || "0", 10);
-  if (actual >= MAX_PER_DAY) return false;
+  if (actual >= maxPorConexion) return false;
   await env.LIMITS.put(clave, String(actual + 1), { expirationTtl: 86400 });
-  await env.LIMITS.put(`t:${dia}`, String(total + 1), { expirationTtl: 172800 });
+  await env.LIMITS.put(claveTotal, String(total + 1), { expirationTtl: 172800 });
   return true;
 }
 
-async function buscarIssue(env, dominio) {
-  const q = encodeURIComponent(`repo:${env.REPO} is:issue is:open in:title "${dominio}"`);
+async function buscarIssue(env, titulo) {
+  const q = encodeURIComponent(`repo:${env.REPO} is:issue is:open in:title "${titulo}"`);
   const r = await github(env, `/search/issues?q=${q}&per_page=10`);
-  const hit = (r.items || []).find((i) => i.title === dominio);
+  const hit = (r.items || []).find((i) => i.title === titulo);
   return hit ? hit.number : null;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Informes de errores anónimos de la app (opcionales; el usuario los activa y puede verlos antes).
+// Solo se aceptan campos conocidos con formatos cerrados: nada de texto libre.
+// ---------------------------------------------------------------------------------------------
+
+const MAX_INFORME_BYTES = 8192;
+const MAX_ERRORES_POR_INFORME = 10; // cada error son hasta 2 llamadas a GitHub
+const CANALES = ["stable", "beta", "nightly"];
+const NIVELES = ["light", "balanced", "strict"];
+const DIA = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Texto corto y seguro: solo letras, números y unos pocos signos (igual que filtra la app). */
+export function limpiarCampo(valor, max = 120) {
+  return String(valor ?? "").replace(/[^A-Za-z0-9 _.:$/<>-]/g, "").trim().slice(0, max);
+}
+
+const entero = (v, min, max) => (Number.isInteger(v) && v >= min && v <= max ? v : null);
+
+/** Valida y normaliza un informe. Devuelve null si no tiene la forma esperada. */
+export function limpiarInforme(data) {
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return null;
+  const android = entero(data.android, 21, 99);
+  if (android === null || !Array.isArray(data.errores) || data.errores.length === 0) return null;
+  const errores = data.errores.slice(0, MAX_ERRORES_POR_INFORME).map((e) => {
+    if (typeof e !== "object" || e === null) return null;
+    const tipo = String(e.tipo ?? "").toLowerCase();
+    if (!/^[a-z_]{1,40}$/.test(tipo)) return null;
+    return {
+      tipo,
+      detalle: limpiarCampo(e.detalle, 60),
+      traza: (Array.isArray(e.traza) ? e.traza : []).slice(0, 12).map((l) => limpiarCampo(l)).filter(Boolean),
+      veces: entero(e.veces, 1, 9999) ?? 1,
+      primer_dia: DIA.test(e.primer_dia) ? e.primer_dia : "",
+      ultimo_dia: DIA.test(e.ultimo_dia) ? e.ultimo_dia : "",
+    };
+  }).filter(Boolean);
+  if (errores.length === 0) return null;
+  return {
+    version: String(data.version ?? "").slice(0, 40).replace(/[^\w.\-]/g, ""),
+    canal: CANALES.includes(data.canal) ? data.canal : "",
+    android,
+    fabricante: limpiarCampo(data.fabricante, 30).toLowerCase(),
+    nivel: NIVELES.includes(data.nivel) ? data.nivel : "",
+    listas_extra: entero(data.listas_extra, 0, 50) ?? 0,
+    amenazas: data.amenazas === true,
+    errores,
+  };
+}
+
+/** Lo que identifica "el mismo error": tipo, detalle y las primeras líneas de la traza. */
+export async function firmaDeError(e) {
+  const bytes = new TextEncoder().encode([e.tipo, e.detalle, ...e.traza.slice(0, 4)].join("|"));
+  const hash = [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes))].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return hash.slice(0, 10);
+}
+
+async function recibirInformeDeErrores(request, env, cors) {
+  let informe;
+  try {
+    const texto = await request.text();
+    if (texto.length > MAX_INFORME_BYTES) return json({ ok: false, error: "datos demasiado grandes" }, 413, cors);
+    informe = limpiarInforme(JSON.parse(texto));
+  } catch {
+    informe = null;
+  }
+  if (!informe) return json({ ok: false, error: "datos no válidos" }, 400, cors);
+
+  if (!(await dentroDelLimite(request, env, { prefijo: "e", maxPorConexion: 5, maxTotal: 1000 }))) {
+    return json({ ok: false, error: "demasiados informes hoy desde esta conexión" }, 429, cors);
+  }
+
+  const contexto = `v${informe.version || "?"} (${informe.canal || "?"}) · Android API ${informe.android} · ${informe.fabricante || "?"} · nivel ${informe.nivel || "?"}, ${informe.listas_extra} listas extra, amenazas ${informe.amenazas ? "sí" : "no"}`;
+  try {
+    for (const e of informe.errores) {
+      const titulo = `Error: ${e.tipo} · ${await firmaDeError(e)}`;
+      // Todo va en bloques de código: GitHub no interpreta nada de lo recibido.
+      const linea = `${e.veces} vez/veces entre ${e.primer_dia || "?"} y ${e.ultimo_dia || "?"}\n\`\`\`text\n${contexto}\n\`\`\``;
+      const existente = await buscarIssue(env, titulo);
+      if (existente) {
+        await github(env, `/repos/${env.REPO}/issues/${existente}/comments`, { body: `+ ${linea}` });
+      } else {
+        const cuerpo = `**Tipo:** \`${e.tipo}\`${e.detalle ? ` · **Detalle:** \`${e.detalle}\`` : ""}\n\n**Traza:**\n\`\`\`text\n${e.traza.join("\n") || "(sin traza)"}\n\`\`\`\n\n${linea}`;
+        await crearIssue(env, { title: titulo, body: cuerpo, labels: ["error"] });
+      }
+    }
+  } catch {
+    return json({ ok: false, error: "no se pudo guardar el informe" }, 502, cors);
+  }
+  return json({ ok: true }, 200, cors);
+}
+
+/** Crea la incidencia; si la etiqueta no existe aún en el repositorio, la crea sin etiqueta. */
+async function crearIssue(env, issue) {
+  try {
+    await github(env, `/repos/${env.REPO}/issues`, issue);
+  } catch (e) {
+    if (!String(e.message).includes("422")) throw e;
+    await github(env, `/repos/${env.REPO}/issues`, { title: issue.title, body: issue.body });
+  }
 }
 
 async function github(env, path, body) {

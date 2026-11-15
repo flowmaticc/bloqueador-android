@@ -47,6 +47,8 @@ android {
         buildConfigField("String", "UPDATE_REPO", "\"flowmaticc/bloqueador-android\"")
         // Servicio de reportes de dominios para analizar (carpeta reportes/ del repositorio).
         buildConfigField("String", "REPORT_URL", "\"https://garbillo-reportes.flowmaticc.workers.dev/reportar\"")
+        // Informes de errores anónimos (opcionales): mismo servicio, otra ruta.
+        buildConfigField("String", "ERROR_URL", "\"https://garbillo-reportes.flowmaticc.workers.dev/error\"")
         // API de GitHub. Solo se cambia para pruebas locales (-PupdateApiBase=http://127.0.0.1:8000).
         buildConfigField(
             "String", "UPDATE_API_BASE",

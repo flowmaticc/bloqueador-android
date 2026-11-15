@@ -30,6 +30,9 @@ import app.bloqueador.dns.IpPacket
 import app.bloqueador.dns.UdpPacket
 import app.bloqueador.BuildConfig
 import app.bloqueador.debug.QueryLog
+import app.bloqueador.diag.ErrorReports
+import app.bloqueador.update.DownloadPolicy
+import app.bloqueador.update.ListUpdateScheduler
 import app.bloqueador.filter.DomainMatcher
 import app.bloqueador.filter.FilterEngine
 import kotlinx.coroutines.withContext
@@ -183,6 +186,7 @@ class DnsVpnService : VpnService() {
         if (opened == null) {
             // null = la app no tiene permiso VPN (p. ej. otra VPN lo tiene ahora).
             app.setVpnState(VpnState.Error("No se pudo activar la VPN. ¿Hay otra VPN activa?"))
+            ErrorReports.record(this, "vpn_no_activa", null, "establish")
             stopVpn(keepState = true)
             return
         }
@@ -267,10 +271,16 @@ class DnsVpnService : VpnService() {
     private fun loadBlocklist() {
         scope.launch {
             app.setVpnState(VpnState.Running(loadingList = true))
-            try {
-                app.repository.downloadMissing()
-            } catch (e: Exception) {
-                Log.w(TAG, "No se pudo descargar alguna lista", e)
+            if (DownloadPolicy.automaticAllowed(this@DnsVpnService)) {
+                try {
+                    app.repository.downloadMissing()
+                } catch (e: Exception) {
+                    Log.w(TAG, "No se pudo descargar alguna lista", e)
+                    ErrorReports.record(this@DnsVpnService, "listas_descarga", e)
+                }
+            } else {
+                // "Solo con wifi" y ahora con datos móviles: lo que falte se descarga al conectar a una wifi.
+                ListUpdateScheduler.downloadWhenAllowed(this@DnsVpnService)
             }
             try {
                 app.reloadEngine()

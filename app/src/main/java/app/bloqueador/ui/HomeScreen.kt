@@ -20,7 +20,10 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
+import app.bloqueador.update.DownloadPolicy
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -80,6 +83,8 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
     var rules by remember { mutableIntStateOf(0) }
     var threatRules by remember { mutableIntStateOf(0) }
     var dnsSilent by remember { mutableStateOf(false) }
+    var waitingForWifi by remember { mutableStateOf(false) }
+    var confirmMobileData by remember { mutableStateOf(false) }
     // Se vuelve a leer al volver de los ajustes de Android (el usuario puede haberlo cambiado).
     var privateDns by remember { mutableStateOf(privateDnsMode(context)) }
     // Solo mientras la pantalla está a la vista: en segundo plano no se despierta la CPU para nada.
@@ -92,6 +97,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
                 rules = app.engine.matcher.size
                 threatRules = app.engine.threats.size
                 dnsSilent = app.dnsUnresponsive?.invoke() == true
+                waitingForWifi = !DownloadPolicy.automaticAllowed(context)
                 privateDns = privateDnsMode(context)
                 lastUpdated = app.repository.lastUpdated // la descarga inicial la hace el servicio
                 delay(1000)
@@ -100,7 +106,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
     }
 
     val running = state is VpnState.Running || state == VpnState.Starting
-    val protection = protectionOf(state, rules, dnsSilent, privateDns == "hostname")
+    val protection = protectionOf(state, rules, dnsSilent, privateDns == "hostname", waitingForWifi)
 
     Column(
         Modifier
@@ -183,34 +189,54 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
                 }
             )
             updateMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+            fun updateNow() {
+                updating = true
+                updateMessage = null
+                scope.launch {
+                    val result = app.repository.downloadAll()
+                    app.repository.recordCheck(result)
+                    if (result.ok) UpdateNotifier.clear(context)
+                    // Solo se cargan en memoria si el filtro está activo (ahorro de RAM).
+                    if (result.changed && app.vpnState.value is VpnState.Running) app.reloadEngine()
+                    lastUpdated = app.repository.lastUpdated
+                    updateMessage = when {
+                        !result.ok -> "Error al actualizar: ${result.errors.joinToString("; ")}"
+                        result.changed -> "Listas actualizadas"
+                        else -> "Las listas ya estaban al día"
+                    }
+                    updating = false
+                }
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Button(
                     enabled = !updating,
-                    onClick = {
-                        updating = true
-                        updateMessage = null
-                        scope.launch {
-                            val result = app.repository.downloadAll()
-                            app.repository.recordCheck(result)
-                            if (result.ok) UpdateNotifier.clear(context)
-                            // Solo se cargan en memoria si el filtro está activo (ahorro de RAM).
-                            if (result.changed && app.vpnState.value is VpnState.Running) app.reloadEngine()
-                            lastUpdated = app.repository.lastUpdated
-                            updateMessage = when {
-                                !result.ok -> "Error al actualizar: ${result.errors.joinToString("; ")}"
-                                result.changed -> "Listas actualizadas"
-                                else -> "Las listas ya estaban al día"
-                            }
-                            updating = false
-                        }
-                    },
+                    // Con datos móviles se pide confirmación: las listas pueden ocupar varios MB.
+                    onClick = { if (DownloadPolicy.isMetered(context)) confirmMobileData = true else updateNow() },
                 ) { Text("Actualizar ahora") }
                 if (updating) {
                     Spacer(Modifier.width(12.dp))
                     CircularProgressIndicator()
                 }
             }
+            if (confirmMobileData) {
+                AlertDialog(
+                    onDismissRequest = { confirmMobileData = false },
+                    title = { Text("¿Usar datos móviles?") },
+                    text = {
+                        Text(
+                            "No estás conectado a una wifi. Descargar las listas puede ocupar entre 5 y 40 MB " +
+                                "según las que tengas activadas (si ya están al día, casi nada)."
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { confirmMobileData = false; updateNow() }) { Text("Descargar") }
+                    },
+                    dismissButton = { TextButton(onClick = { confirmMobileData = false }) { Text("Cancelar") } },
+                )
+            }
         }
+
+        if (app.settings.onboardingDone) ErrorReportsQuestionCard()
     }
 }
 
@@ -221,7 +247,13 @@ internal data class Protection(val title: String, val detail: String, val warnin
  * Estado real de la protección: con la VPN encendida no basta para decir "Protegido"; también hacen
  * falta listas cargadas, un DNS que conteste y que Android no se salte el filtro con su DNS privado.
  */
-internal fun protectionOf(state: VpnState, rules: Int, dnsSilent: Boolean, privateDnsFixed: Boolean): Protection =
+internal fun protectionOf(
+    state: VpnState,
+    rules: Int,
+    dnsSilent: Boolean,
+    privateDnsFixed: Boolean,
+    waitingForWifi: Boolean = false,
+): Protection =
     when (state) {
         VpnState.Stopped -> Protection("Desactivado", "La publicidad no se está filtrando")
         VpnState.Starting -> Protection("Activando…", "Preparando el filtro")
@@ -229,6 +261,12 @@ internal fun protectionOf(state: VpnState, rules: Int, dnsSilent: Boolean, priva
         is VpnState.Running -> when {
             state.loadingList -> Protection("Activando…", "Cargando la lista de bloqueo…")
             privateDnsFixed -> Protection("Sin efecto", "El DNS privado de Android se salta el filtro (mira el aviso de abajo)", warning = true)
+            rules == 0 && waitingForWifi -> Protection(
+                "Esperando a una wifi",
+                "Las listas se descargarán en cuanto te conectes a una wifi. Si no quieres esperar, pulsa " +
+                    "\"Actualizar ahora\" (usará datos móviles).",
+                warning = true,
+            )
             rules == 0 -> Protection(
                 "Protección incompleta",
                 "No hay ninguna lista cargada. Comprueba la conexión y pulsa \"Actualizar ahora\".",

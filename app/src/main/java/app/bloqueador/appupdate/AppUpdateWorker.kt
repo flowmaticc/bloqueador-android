@@ -47,18 +47,19 @@ class AppUpdateWorker(context: Context, params: WorkerParameters) : CoroutineWor
         private const val NOTIFICATION_ID = 3
         const val EXTRA_OPEN_UPDATES = "open_updates"
 
+        /** Programa la comprobación diaria con la red que pide [DownloadPolicy] (sin reiniciar su reloj). */
         fun schedule(context: Context) {
             val request = PeriodicWorkRequestBuilder<AppUpdateWorker>(24, TimeUnit.HOURS)
                 .setConstraints(
                     Constraints.Builder()
-                        .setRequiredNetworkType(NetworkType.CONNECTED)
+                        .setRequiredNetworkType(app.bloqueador.update.DownloadPolicy.networkType())
                         .setRequiresBatteryNotLow(true)
                         .build()
                 )
                 .setInitialDelay(2, TimeUnit.HOURS)
                 .build()
             WorkManager.getInstance(context)
-                .enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.KEEP, request)
+                .enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
         }
 
         private fun notify(context: Context, info: UpdateInfo) {
