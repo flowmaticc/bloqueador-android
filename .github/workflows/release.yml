@@ -87,9 +87,22 @@ jobs:
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
+          set -o pipefail
           ./gradlew --no-daemon :app:testReleaseUnitTest :app:assembleRelease \
             -PversionCode=${{ steps.version.outputs.code }} \
-            -PversionName=${{ steps.version.outputs.name }}
+            -PversionName=${{ steps.version.outputs.name }} 2>&1 | tee build.log
+
+      - name: Errores de compilación y tests
+        if: failure()
+        run: |
+          # Como avisos del flujo: se ven en la página de la ejecución sin descargar el registro.
+          grep -E '^e: |^> Task .* FAILED|Test.*FAILED|What went wrong' build.log | head -20 | while read -r l; do
+            echo "::error::$l"
+          done
+          for f in app/build/test-results/*/*.xml; do
+            grep -q "<failure" "$f" 2>/dev/null || continue
+            grep -o '<failure message="[^"]*"' "$f" | head -3 | while read -r l; do echo "::error::$(basename "$f"): $l"; done
+          done
 
       - name: Comprobar que el APK es la versión normal
         if: steps.version.outputs.skip != 'true'

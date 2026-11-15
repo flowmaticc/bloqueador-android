@@ -1,5 +1,6 @@
 package app.bloqueador.ui
 
+import android.net.VpnService
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -28,7 +29,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import app.bloqueador.BloqueadorApp
+import app.bloqueador.VpnState
 import app.bloqueador.apps.AppStrategy
+import app.bloqueador.vpn.DnsVpnService
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,12 +52,12 @@ class MainActivity : ComponentActivity() {
      */
     override fun onResume() {
         super.onResume()
-        val app = BloqueadorApp.instance
-        if (app.settings.onboardingDone && app.settings.filterWanted &&
-            app.vpnState.value == app.bloqueador.VpnState.Stopped &&
-            android.net.VpnService.prepare(this) == null
+        val garbillo = BloqueadorApp.instance
+        if (garbillo.settings.onboardingDone && garbillo.settings.filterWanted &&
+            garbillo.vpnState.value == VpnState.Stopped &&
+            VpnService.prepare(this) == null
         ) {
-            runCatching { app.bloqueador.vpn.DnsVpnService.start(this) }
+            runCatching { DnsVpnService.start(this) }
         }
     }
 
