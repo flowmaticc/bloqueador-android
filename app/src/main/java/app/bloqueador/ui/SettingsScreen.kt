@@ -654,7 +654,8 @@ private fun AboutSection() {
         Text("Versión ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
         Text(
             "Garbillo es un bloqueador de publicidad y rastreadores para todo el móvil, sin root. Funciona dentro del " +
-                "móvil: no envía tus datos a ningún servidor y no recoge estadísticas.",
+                "móvil: tu navegación no se envía a ningún servidor y no recoge estadísticas. Solo sale del " +
+                "móvil lo que tú decidas reportar.",
             style = MaterialTheme.typography.bodySmall,
         )
         Text("Software libre, licencia GPLv3. Listas de bloqueo de Hagezi y otros autores.", style = MaterialTheme.typography.bodySmall)

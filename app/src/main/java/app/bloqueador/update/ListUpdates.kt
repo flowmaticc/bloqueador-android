@@ -70,6 +70,9 @@ class ListUpdateWorker(context: Context, params: WorkerParameters) : CoroutineWo
 
     override suspend fun doWork(): Result {
         val app = applicationContext as BloqueadorApp
+        // Aprovecha que el móvil ya está despierto: aunque el filtro lleve días apagado (sin
+        // consultas nuevas que disparen la limpieza), el historial antiguo se borra a su tiempo.
+        runCatching { app.history.cleanup() }
         val result = app.repository.downloadAll()
 
         if (result.changed && app.vpnState.value is VpnState.Running) {

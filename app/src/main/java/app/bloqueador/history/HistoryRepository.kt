@@ -36,8 +36,10 @@ class HistoryRepository(private val context: Context, private val settings: AppS
         dao.deleteOlderThan(limit)
     }
 
+    /** Borra todo el historial, también del archivo y de su diario de escritura. */
     suspend fun clear() {
         dao.deleteAll()
+        withContext(Dispatchers.IO) { HistoryDatabase.truncateWal(db) }
     }
 
     /** Webs en las que probablemente apareció [event] (ver [SiteGuess]). */

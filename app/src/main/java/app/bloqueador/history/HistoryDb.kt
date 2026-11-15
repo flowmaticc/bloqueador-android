@@ -10,6 +10,7 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -88,6 +89,20 @@ abstract class HistoryDatabase : RoomDatabase() {
             Room.databaseBuilder(context, HistoryDatabase::class.java, "history.db")
                 // El historial es efímero (TTL de horas): ante un cambio de esquema se recrea sin más.
                 .fallbackToDestructiveMigration(dropAllTables = true)
+                .addCallback(object : RoomDatabase.Callback() {
+                    // Lo borrado se sobrescribe con ceros en el archivo, en vez de quedar en páginas libres.
+                    override fun onOpen(db: SupportSQLiteDatabase) {
+                        db.query("PRAGMA secure_delete = ON").use { it.moveToFirst() }
+                    }
+                })
                 .build()
+
+        /**
+         * Vacía el diario de escritura (WAL) en la base de datos y lo deja a cero, para que tampoco
+         * queden ahí copias de lo borrado.
+         */
+        fun truncateWal(db: HistoryDatabase) {
+            db.openHelper.writableDatabase.query("PRAGMA wal_checkpoint(TRUNCATE)").use { it.moveToFirst() }
+        }
     }
 }

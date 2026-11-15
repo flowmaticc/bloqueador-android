@@ -1,7 +1,7 @@
 # Garbillo
 
 Bloqueador de publicidad, rastreadores y **sitios peligrosos** para **Android**, en todo el móvil
-(navegador, apps y juegos), **sin root**, sin cuentas y sin enviar datos a ningún servidor.
+(navegador, apps y juegos), **sin root**, sin cuentas y sin enviar tu navegación a ningún servidor.
 
 *Garbillo: la criba de esparto con la que se limpiaba el grano. Deja pasar lo bueno y retiene lo demás.*
 

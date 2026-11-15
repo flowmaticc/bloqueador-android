@@ -2,7 +2,8 @@
 
 ## Próxima versión
 
-- Sin cambios todavía respecto a la 0.3.0.
+- **Historial más privado**: al borrarlo no quedan restos en el archivo del móvil, y lo antiguo se
+  borra a su tiempo aunque el filtro lleve días apagado.
 
 ## 0.3.0
 
