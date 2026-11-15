@@ -221,11 +221,11 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
             if (confirmMobileData) {
                 AlertDialog(
                     onDismissRequest = { confirmMobileData = false },
-                    title = { Text("¿Usar datos móviles?") },
+                    title = { Text("¿Descargar con esta red?") },
                     text = {
                         Text(
-                            "No estás conectado a una wifi. Descargar las listas puede ocupar entre 5 y 40 MB " +
-                                "según las que tengas activadas (si ya están al día, casi nada)."
+                            "Estás usando datos móviles o una wifi con límite de datos. Descargar las listas puede " +
+                                "ocupar entre 5 y 40 MB según las que tengas activadas (si ya están al día, casi nada)."
                         )
                     },
                     confirmButton = {
@@ -263,8 +263,8 @@ internal fun protectionOf(
             privateDnsFixed -> Protection("Sin efecto", "El DNS privado de Android se salta el filtro (mira el aviso de abajo)", warning = true)
             rules == 0 && waitingForWifi -> Protection(
                 "Esperando a una wifi",
-                "Las listas se descargarán en cuanto te conectes a una wifi. Si no quieres esperar, pulsa " +
-                    "\"Actualizar ahora\" (usará datos móviles).",
+                "Las listas se descargarán en cuanto te conectes a una wifi sin límite de datos. Si no quieres " +
+                    "esperar, pulsa \"Actualizar ahora\" (usará la red actual).",
                 warning = true,
             )
             rules == 0 -> Protection(
