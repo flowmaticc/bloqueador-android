@@ -9,6 +9,7 @@
   pasan, algo que deja de funcionar o una web peligrosa).
 - **Estado real de la protección**: la pantalla principal avisa si no hay listas cargadas, si el DNS
   de tu red no responde o si el DNS privado de Android se salta el filtro.
+- **Se activa solo al encender el móvil** si lo tenías activado, sin tener que abrir la app.
 - **Sin anuncios al arrancar**: el filtro carga las listas antes de empezar a filtrar.
 - Si el DNS de tu red deja de responder, se usa otro automáticamente.
 - Más protección frente a respuestas DNS falsas en redes wifi públicas.

@@ -95,6 +95,7 @@ fun settingsIndex(manufacturer: String?): List<SettingEntry> = buildList {
     add(SettingEntry(SettingsSection.HISTORY, "Tiempo que se conserva el historial", "conservar retencion 1 3 6 24 horas"))
     add(SettingEntry(SettingsSection.HISTORY, "Borrar historial", "eliminar limpiar"))
     add(SettingEntry(SettingsSection.BATTERY, "Que Android no cierre el filtro", "bateria ahorro optimizacion sin restricciones se apaga"))
+    add(SettingEntry(SettingsSection.BATTERY, "Al encender el móvil", "arranque inicio encender reiniciar automatico activar solo"))
     add(SettingEntry(SettingsSection.BATTERY, "VPN siempre activa", "arranque inicio encender reiniciar automatico bloquear conexiones sin vpn"))
     add(SettingEntry(SettingsSection.ABOUT, "Web y política de privacidad", "pagina privacidad datos permisos ayuda"))
     add(SettingEntry(SettingsSection.APP_UPDATES, "Canal de actualizaciones", "estable beta nightly version actualizar app instalar"))
@@ -595,13 +596,20 @@ private fun BatterySection() {
         OutlinedButton(onClick = { BatteryGuide.openSettings(context) }) { Text("Abrir ajustes de batería") }
     }
     val alwaysOn = BloqueadorApp.instance.settings.alwaysOnVpn
+    SectionCard("Al encender el móvil") {
+        Text(
+            "Si dejas el filtro activado, Garbillo se vuelve a activar solo al encender el móvil " +
+                "(tras el primer desbloqueo).",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+    }
     SectionCard("VPN siempre activa (recomendado)") {
         Text(
             when (alwaysOn) {
-                true -> "Activada: Android arranca el filtro solo al encender el móvil y lo vuelve a abrir si se cierra."
-                false -> "Sin activar. Con ella, Android arranca el filtro solo al encender el móvil y lo vuelve a " +
+                true -> "Activada: Android arranca el filtro en cuanto se enciende el móvil y lo vuelve a abrir si se cierra."
+                false -> "Sin activar. Con ella, Android arranca el filtro en cuanto se enciende el móvil y lo vuelve a " +
                     "abrir si algo lo cierra."
-                null -> "Con ella, Android arranca el filtro solo al encender el móvil y lo vuelve a abrir si algo lo cierra."
+                null -> "Con ella, Android arranca el filtro en cuanto se enciende el móvil y lo vuelve a abrir si algo lo cierra."
             },
             style = MaterialTheme.typography.bodyMedium,
         )

@@ -49,8 +49,9 @@ Requiere Android 8.0 o superior.
 ## Permisos
 
 VPN (el filtro local) · Internet y estado de la red · Servicio en primer plano · Notificaciones ·
-Ver apps instaladas (para elegir cuáles se filtran) · Instalar actualizaciones · Arranque y
-mantener activo (los añade WorkManager). No pide accesibilidad, captura de pantalla, ubicación,
+Ver apps instaladas (para elegir cuáles se filtran) · Instalar actualizaciones · Arranque (para
+volver a activar el filtro al encender el móvil y reprogramar las actualizaciones de listas) y
+mantener activo (lo añade WorkManager). No pide accesibilidad, captura de pantalla, ubicación,
 contactos ni almacenamiento. Explicación detallada en la [web](https://flowmaticc.github.io/utilities/bloqueador-android/#permisos).
 
 ## Compilar
