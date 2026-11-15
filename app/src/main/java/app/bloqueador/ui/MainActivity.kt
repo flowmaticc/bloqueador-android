@@ -42,6 +42,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Si el usuario dejó el filtro activado y está apagado (algunos fabricantes, como Xiaomi, no dejan
+     * que se reactive solo tras actualizar o reiniciar), se vuelve a activar al abrir la app. No se
+     * hace si otra VPN tiene ahora el permiso ni si hubo un error al activarlo.
+     */
+    override fun onResume() {
+        super.onResume()
+        val app = BloqueadorApp.instance
+        if (app.settings.onboardingDone && app.settings.filterWanted &&
+            app.vpnState.value == app.bloqueador.VpnState.Stopped &&
+            android.net.VpnService.prepare(this) == null
+        ) {
+            runCatching { app.bloqueador.vpn.DnsVpnService.start(this) }
+        }
+    }
+
     companion object {
         /** Abrir el historial con el filtro "Amenazas" (desde el aviso de sitio peligroso). */
         const val EXTRA_OPEN_THREATS = "open_threats"

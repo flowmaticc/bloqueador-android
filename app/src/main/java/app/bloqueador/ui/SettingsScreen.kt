@@ -97,7 +97,7 @@ fun settingsIndex(manufacturer: String?): List<SettingEntry> = buildList {
     add(SettingEntry(SettingsSection.HISTORY, "Tiempo que se conserva el historial", "conservar retencion 1 3 6 24 horas"))
     add(SettingEntry(SettingsSection.HISTORY, "Borrar historial", "eliminar limpiar"))
     add(SettingEntry(SettingsSection.BATTERY, "Que Android no cierre el filtro", "bateria ahorro optimizacion sin restricciones se apaga"))
-    add(SettingEntry(SettingsSection.BATTERY, "Al encender el móvil", "arranque inicio encender reiniciar automatico activar solo"))
+    add(SettingEntry(SettingsSection.BATTERY, "Al encender el móvil", "arranque inicio encender reiniciar automatico activar solo inicio automatico autostart xiaomi huawei oppo vivo"))
     add(SettingEntry(SettingsSection.BATTERY, "VPN siempre activa", "arranque inicio encender reiniciar automatico bloquear conexiones sin vpn"))
     add(SettingEntry(SettingsSection.ABOUT, "Web y política de privacidad", "pagina privacidad datos permisos ayuda"))
     add(SettingEntry(SettingsSection.APP_UPDATES, "Canal de actualizaciones", "estable beta nightly version actualizar app instalar"))
@@ -636,9 +636,17 @@ private fun BatterySection() {
     SectionCard("Al encender el móvil") {
         Text(
             "Si dejas el filtro activado, Garbillo se vuelve a activar solo al encender el móvil " +
-                "(tras el primer desbloqueo).",
+                "(tras el primer desbloqueo) y después de actualizarse. Si aun así lo encuentras apagado, " +
+                "se activa de nuevo al abrir la app.",
             style = MaterialTheme.typography.bodyMedium,
         )
+        BatteryGuide.autostartSteps()?.let { steps ->
+            Text(
+                "En este móvil hace falta además el permiso de \"Inicio automático\": $steps",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            OutlinedButton(onClick = { BatteryGuide.openAutostart(context) }) { Text("Abrir inicio automático") }
+        }
     }
     SectionCard("VPN siempre activa (recomendado)") {
         Text(

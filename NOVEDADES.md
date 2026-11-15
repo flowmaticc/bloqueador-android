@@ -2,6 +2,9 @@
 
 ## Próxima versión
 
+- **Xiaomi, Huawei, OPPO y Vivo**: un aviso explica cómo dar el permiso de "Inicio automático", sin el
+  cual el sistema no deja que el filtro se vuelva a activar solo tras reiniciar o actualizar.
+- Si el filtro estaba activado y lo encuentras apagado, se vuelve a activar al abrir la app.
 - Corregido: si una lista no se puede descargar (por ejemplo, sin conexión), el ajuste vuelve a como
   estaba y se avisa, en vez de quedarse marcado sin funcionar.
 - Corregido: cambiar de nivel de bloqueo sin conexión podía dejar el móvil sin ninguna lista; ahora la

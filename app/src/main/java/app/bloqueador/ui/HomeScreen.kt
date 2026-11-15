@@ -151,7 +151,10 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
             }
         }
 
-        if (running) BatteryGuideCard()
+        if (running) {
+            AutostartCard()
+            BatteryGuideCard()
+        }
 
         SectionCard("Desde que se activó") {
             Text("Consultas DNS: $queries")
