@@ -50,6 +50,7 @@ import app.bloqueador.lists.ThreatLevel
 import app.bloqueador.settings.AppSettings
 import app.bloqueador.settings.HistoryRetention
 import app.bloqueador.settings.UpdateFrequency
+import app.bloqueador.update.DownloadPolicy
 import app.bloqueador.update.ListUpdateScheduler
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -554,7 +555,7 @@ private fun ListUpdatesSection() {
         ) { on ->
             wifiOnly = on
             settings.downloadsWifiOnly = on
-            app.bloqueador.update.DownloadPolicy.reschedule(context)
+            DownloadPolicy.reschedule(context)
         }
     }
     SectionCard("Estado") {
