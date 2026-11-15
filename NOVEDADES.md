@@ -2,6 +2,10 @@
 
 ## Próxima versión
 
+- Sin cambios todavía respecto a la 0.3.2.
+
+## 0.3.2
+
 - **Xiaomi, Huawei, OPPO y Vivo**: un aviso explica cómo dar el permiso de "Inicio automático", sin el
   cual el sistema no deja que el filtro se vuelva a activar solo tras reiniciar o actualizar.
 - Si el filtro estaba activado y lo encuentras apagado, se vuelve a activar al abrir la app.
@@ -9,6 +13,7 @@
   estaba y se avisa, en vez de quedarse marcado sin funcionar.
 - Corregido: cambiar de nivel de bloqueo sin conexión podía dejar el móvil sin ninguna lista; ahora la
   lista anterior se conserva hasta que la nueva se descarga bien.
+- Las novedades de cada actualización se ven completas, sin cortes a mitad de frase.
 
 ## 0.3.1
 
