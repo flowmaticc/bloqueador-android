@@ -58,6 +58,7 @@ fábrica del móvil.
 |---|---|---|
 | Samsung Galaxy A7 (2018), batería de 3300 mAh | 10 | Móvil de pruebas, solo con wifi |
 | Google Pixel 10 | 17 | Uso diario normal |
+| Xiaomi Redmi Note 10S (MIUI 14) | 13 | Móvil de pruebas, solo con wifi |
 | Emulador | 16 (API 36) | Prueba de humo de cada cambio |
 
 ### 24 horas con carga (Galaxy A7, versión 0.1.0, noviembre de 2026)
@@ -109,6 +110,20 @@ pasar la lista Hagezi Pro a propósito, porque bloquearlos rompe enlaces. El niv
 | Reiniciar el móvil | El filtro se activa solo |
 | Apagar y encender el filtro | Correcto |
 | Quedarse sin red y recuperarla | Sin red sigue bloqueando; al volver la wifi, todo funciona en 4 s |
+
+### Actualizar desde una versión antigua y restricciones de Xiaomi (Redmi Note 10S, 15/11/2026)
+
+Instalación limpia de la 0.2.0, configurada con las seis listas adicionales, y actualizaciones desde la
+propia app a la 0.3.1 y a la versión de desarrollo siguiente.
+
+| Prueba | Resultado |
+|---|---|
+| Actualizar desde la app (0.2.0 → 0.3.1 → desarrollo) | Correcto; se conservan nivel, listas, apps protegidas e historial |
+| Reactivarse solo tras actualizar | MIUI lo impide si la app no tiene "Inicio automático" |
+| Abrir la app con el filtro apagado | El filtro vuelve a activarse solo |
+| Aviso de "Inicio automático" | Aparece en la pantalla principal y su botón abre los ajustes de Xiaomi |
+| Cambiar a nivel Estricto sin conexión | Vuelve al nivel anterior, avisa y el filtro sigue bloqueando con su lista |
+| Reiniciar con "Inicio automático" permitido | El filtro se activa solo a los 31 s del arranque |
 
 ### Registro interno (solo compilaciones de depuración)
 
