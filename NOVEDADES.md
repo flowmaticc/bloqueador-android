@@ -2,6 +2,10 @@
 
 ## Próxima versión
 
+- Sin cambios todavía respecto a la 0.3.3.
+
+## 0.3.3
+
 - **Bienvenida nueva**: ayuda a dejar listo lo que hace que el filtro funcione siempre (notificaciones,
   batería e inicio automático) y te deja elegir cómo descargar y si quieres enviar informes de errores.
 - **Descargar solo con wifi** (activado por defecto): las listas y las comprobaciones de versiones se
@@ -10,6 +14,7 @@
 - **Informes de errores anónimos, opcionales**: si los activas, cuando algo falla se envía un aviso sin
   webs, historial, apps ni identificadores. Puedes ver el informe exacto antes de que salga en
   Ajustes → Informes de errores.
+- Si al activar el filtro no se pueden descargar las listas, se vuelve a intentar en cuanto hay red.
 - Al actualizar desde la app, se explica qué hacer si Google Play Protect bloquea la instalación.
 - Las versiones de desarrollo (Nightly) se numeran siempre por delante de la última estable, para que
   no parezca que una actualización baja de versión.
