@@ -1,7 +1,14 @@
 package app.bloqueador.dns
 
 /** Pregunta DNS extraída de una consulta. [end] es el índice (en el payload) justo tras la pregunta. */
-data class DnsQuestion(val name: String, val type: Int, val dnsClass: Int, val end: Int)
+data class DnsQuestion(val name: String, val type: Int, val dnsClass: Int, val end: Int) {
+    /**
+     * true si el nombre solo tiene letras, números, guiones y guiones bajos (un nombre de host real).
+     * Los demás se filtran igual, pero no se anotan en el historial ni salen en avisos.
+     */
+    val isHostname: Boolean
+        get() = name.all { it in 'a'..'z' || it in '0'..'9' || it == '-' || it == '_' || it == '.' }
+}
 
 /**
  * Parser y constructor mínimo de mensajes DNS (RFC 1035). Solo lo necesario para filtrar:
@@ -11,6 +18,8 @@ object DnsMessage {
     const val TYPE_A = 1
     const val TYPE_AAAA = 28
     const val CLASS_IN = 1
+    const val RCODE_FORMERR = 1
+    const val RCODE_SERVFAIL = 2
     const val RCODE_NXDOMAIN = 3
     const val BLOCK_TTL_SECONDS = 60
 
@@ -63,7 +72,9 @@ object DnsMessage {
 
     /**
      * Respuesta de bloqueo para la consulta [query] (solo el payload DNS):
-     * A → 0.0.0.0, AAAA → ::, cualquier otro tipo → NXDOMAIN.
+     * A → 0.0.0.0, AAAA → ::, cualquier otro tipo → NODATA (el nombre "existe" pero sin datos de ese
+     * tipo). NXDOMAIN diría que el nombre no existe para NINGÚN tipo, y Android lo guardaría así en su
+     * caché: una consulta HTTPS/SVCB bloqueada no debe hacer creer que tampoco hay A ni AAAA.
      * Se descartan las secciones adicionales de la consulta (p. ej. EDNS).
      */
     fun buildBlockedResponse(query: ByteArray, question: DnsQuestion, queryOffset: Int = 0): ByteArray {
@@ -79,8 +90,7 @@ object DnsMessage {
 
         val queryFlags = u16(query, queryOffset + 2)
         val rd = queryFlags and 0x0100
-        val rcode = if (addrLen > 0) 0 else RCODE_NXDOMAIN
-        put16(out, 2, 0x8000 or rd or 0x0080 or rcode) // QR=1, RD copiado, RA=1
+        put16(out, 2, 0x8000 or rd or 0x0080)          // QR=1, RD copiado, RA=1, NOERROR
         put16(out, 4, 1)                                // QDCOUNT
         put16(out, 6, if (addrLen > 0) 1 else 0)        // ANCOUNT
         put16(out, 8, 0)                                // NSCOUNT
@@ -94,6 +104,23 @@ object DnsMessage {
             put32(out, p, BLOCK_TTL_SECONDS); p += 4
             put16(out, p, addrLen)                       // RDATA = ceros (0.0.0.0 o ::)
         }
+        return out
+    }
+
+    /**
+     * Respuesta de error [rcode] (p. ej. SERVFAIL) a la consulta [query] (payload DNS completo), con su
+     * pregunta repetida si se puede leer. Así el cliente deja de esperar en vez de reintentar a ciegas.
+     */
+    fun buildErrorResponse(query: ByteArray, rcode: Int): ByteArray {
+        val question = parseQuestion(query)
+        val out = ByteArray(question?.end ?: HEADER_SIZE)
+        System.arraycopy(query, 0, out, 0, out.size)
+        val rd = u16(query, 2) and 0x0100
+        put16(out, 2, 0x8000 or rd or 0x0080 or (rcode and 0xF))
+        put16(out, 4, if (question != null) 1 else 0)
+        put16(out, 6, 0)
+        put16(out, 8, 0)
+        put16(out, 10, 0)
         return out
     }
 

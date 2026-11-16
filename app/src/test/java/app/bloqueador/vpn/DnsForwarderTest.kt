@@ -172,10 +172,49 @@ class DnsForwarderTest {
     }
 
     @Test
-    fun `nunca acumula mas consultas en vuelo que el limite`() {
+    fun `nunca acumula mas consultas en vuelo que el limite global`() {
         val f = start(listOf(InetAddress.getByName("127.0.0.2"))) // nadie contesta
-        repeat(DnsForwarder.MAX_PENDING + 200) { f.forward(request("q$it.example", id = it and 0xFFFF), "q$it.example") }
+        // Muchas apps distintas: el tope que salta es el global.
+        repeat(DnsForwarder.MAX_PENDING + 200) { f.forward(request("q$it.example", id = it and 0xFFFF), "q$it.example", "app${it % 16}") }
         assertEquals(DnsForwarder.MAX_PENDING, f.inFlight)
+    }
+
+    @Test
+    fun `una app que inunda recibe SERVFAIL y las demas siguen resolviendo`() {
+        val f = start()
+        // La app "ruidosa" llena su cupo con consultas que el servidor no contesta (no las leemos).
+        repeat(DnsForwarder.MAX_PENDING_PER_APP) { f.forward(request("flood$it.example", id = it), "flood$it.example", "ruidosa") }
+        assertEquals(DnsForwarder.MAX_PENDING_PER_APP, f.inFlight)
+
+        // Una más de la ruidosa: SERVFAIL inmediato, no se envía.
+        f.forward(request("una-mas.example", id = 0x7777), "una-mas.example", "ruidosa")
+        val servfail = payloadOf(replies.poll(2, TimeUnit.SECONDS)!!)
+        assertEquals(0x7777, DnsMessage.u16(servfail, 0))
+        assertEquals(DnsMessage.RCODE_SERVFAIL, DnsMessage.u16(servfail, 2) and 0xF)
+        assertEquals(DnsForwarder.MAX_PENDING_PER_APP, f.inFlight)
+
+        // Otra app sí pasa y obtiene su respuesta.
+        repeat(DnsForwarder.MAX_PENDING_PER_APP) { receiveAtServer() } // vacía lo de la ruidosa
+        f.forward(request("normal.example", id = 0x4242), "normal.example", "otra")
+        val q = receiveAtServer()
+        assertEquals("normal.example", DnsMessage.parseQuery(q.data, 0, q.length)!!.name)
+        answer(q)
+        assertEquals(0x4242, DnsMessage.u16(payloadOf(replies.poll(3, TimeUnit.SECONDS)!!), 0))
+    }
+
+    @Test
+    fun `al cambiar de red se usa un socket nuevo (otro puerto de origen)`() {
+        var servers = listOf(loopback)
+        val f = DnsForwarder({ true }, { true }, { servers }, { replies.add(it) }, server.localPort)
+            .also { it.start(); forwarder = it }
+        f.forward(request("antes.example", id = 1), "antes.example")
+        val before = receiveAtServer().port
+        servers = listOf(loopback, InetAddress.getByName("127.0.0.3")) // otra red
+        f.forward(request("despues.example", id = 2), "despues.example")
+        val q = receiveAtServer()
+        assertTrue("puerto distinto", q.port != before)
+        answer(q)
+        assertEquals(2, DnsMessage.u16(payloadOf(replies.poll(3, TimeUnit.SECONDS)!!), 0))
     }
 
     @Test
@@ -221,8 +260,10 @@ class DnsForwarderTest {
         val sameLower = dnsQuery("ejemplo.com", 1).also { DnsMessage.put16(it, 2, 0x8180) }
         assertTrue(DnsForwarder.sameQuestion(query, sameLower))
 
+        val formerrNoQuestion = ByteArray(12).also { DnsMessage.put16(it, 2, 0x8181) }
+        assertTrue("FORMERR no puede repetir la pregunta", DnsForwarder.sameQuestion(query, formerrNoQuestion))
         val servfailNoQuestion = ByteArray(12).also { DnsMessage.put16(it, 2, 0x8182) }
-        assertTrue(DnsForwarder.sameQuestion(query, servfailNoQuestion))
+        assertFalse("un SERVFAIL sin pregunta podría ser falso", DnsForwarder.sameQuestion(query, servfailNoQuestion))
         val okNoQuestion = ByteArray(12).also { DnsMessage.put16(it, 2, 0x8180) }
         assertFalse(DnsForwarder.sameQuestion(query, okNoQuestion))
     }

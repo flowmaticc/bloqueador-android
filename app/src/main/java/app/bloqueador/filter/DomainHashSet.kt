@@ -52,9 +52,15 @@ class DomainHashSet private constructor(private val hashes: LongArray) {
         fun of(domains: Collection<String>): DomainHashSet =
             Builder().apply { domains.forEach(::add) }.build()
 
-        /** FNV-1a de 64 bits sobre los caracteres desde [start], con mezcla final (fmix64). */
+        /**
+         * Semilla aleatoria por proceso: las huellas solo viven en memoria (se recalculan al cargar),
+         * así que nadie fuera del móvil puede fabricar a propósito un dominio que choque con otro.
+         */
+        private val SEED = java.security.SecureRandom().nextLong()
+
+        /** FNV-1a de 64 bits (con semilla) sobre los caracteres desde [start], con mezcla final (fmix64). */
         internal fun hash(s: String, start: Int): Long {
-            var h = -0x340d631b7bdddcdbL // 0xcbf29ce484222325
+            var h = -0x340d631b7bdddcdbL xor SEED // 0xcbf29ce484222325
             for (i in start until s.length) {
                 h = h xor s[i].code.toLong()
                 h *= 0x100000001b3L

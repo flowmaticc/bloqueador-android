@@ -1,5 +1,6 @@
 package app.bloqueador.ui
 
+import app.bloqueador.settings.AppSettings
 import android.content.Context
 import android.content.pm.PackageManager
 import android.widget.Toast
@@ -231,7 +232,7 @@ private fun HistoryDetailDialog(
             confirmButton = {
                 TextButton(onClick = {
                     confirmThreat = false
-                    apply("${event.domain} permitido") { settings.allowedDomains = settings.allowedDomains + event.domain }
+                    apply("${event.domain} permitido") { settings.allowedDomains = settings.allowedDomains + listOfNotNull(AppSettings.cleanDomain(event.domain)) }
                 }) { Text("Permitir de todas formas") }
             },
             dismissButton = { TextButton(onClick = { confirmThreat = false }) { Text("Cancelar") } },
@@ -305,10 +306,10 @@ private fun HistoryDetailDialog(
                     event.blocked && FilterEngine.isThreat(event.matchedRule) ->
                         TextButton(onClick = { confirmThreat = true }) { Text("Permitir siempre…") }
                     event.blocked -> TextButton(onClick = {
-                        apply("${event.domain} permitido") { settings.allowedDomains = settings.allowedDomains + event.domain }
+                        apply("${event.domain} permitido") { settings.allowedDomains = settings.allowedDomains + listOfNotNull(AppSettings.cleanDomain(event.domain)) }
                     }) { Text("Permitir siempre") }
                     else -> TextButton(onClick = {
-                        apply("${event.domain} bloqueado") { settings.blockedDomains = settings.blockedDomains + event.domain }
+                        apply("${event.domain} bloqueado") { settings.blockedDomains = settings.blockedDomains + listOfNotNull(AppSettings.cleanDomain(event.domain)) }
                     }) { Text("Bloquear siempre") }
                 }
                 if (event.appPackage != null) {

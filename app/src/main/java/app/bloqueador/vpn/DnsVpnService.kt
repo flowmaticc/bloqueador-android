@@ -356,17 +356,21 @@ class DnsVpnService : VpnService() {
         // Averiguar la app es una llamada al sistema: se hace como mucho una vez por consulta.
         val owner = lazy(LazyThreadSafetyMode.NONE) { ownerOf(udp) }
         if (BuildConfig.DEBUG) QueryLog.query(owner.value, question.name, rule)
+        // Nombres con caracteres raros (no son hosts reales): se filtran igual, pero no se anotan ni
+        // se avisa de ellos, para no guardar ni mostrar lo que una app quiera colar ahí.
+        val annotate = question.isHostname
         if (rule != null) {
             // Se averigua la app antes de responder: tras la respuesta el socket puede cerrarse.
-            record(question.name, rule, owner)
-            if (FilterEngine.isThreat(rule)) threatAlerts?.onThreat(question.name, owner.value)
+            if (annotate) record(question.name, rule, owner)
+            if (annotate && FilterEngine.isThreat(rule)) threatAlerts?.onThreat(question.name, owner.value)
             val response = DnsMessage.buildBlockedResponse(udp.data, question, udp.payloadOffset)
             write(IpPacket.buildUdpReply(udp, response))
         } else {
-            record(question.name, null, owner)
+            if (annotate) record(question.name, null, owner)
             // Copia independiente del búfer de lectura, que se reutiliza en el siguiente read().
             val request = IpPacket.parseUdp(buffer.copyOf(length), length) ?: return
-            forwarder?.forward(request, question.name)
+            // La app que pregunta cuenta para el cupo de consultas en vuelo por app.
+            forwarder?.forward(request, question.name, owner.value)
         }
     }
 
@@ -410,8 +414,11 @@ class DnsVpnService : VpnService() {
         forwarder = null
         upstream?.stop()
         upstream = null
-        // Guarda lo pendiente del historial antes de que se cancele el scope del servicio.
-        recorder?.let { rec -> runBlocking { withTimeoutOrNull(2000) { rec.flush() } } }
+        // Guarda lo pendiente del historial en otro hilo: no bloquea el hilo principal (riesgo de ANR)
+        // y no depende del scope del servicio, que se cancela al destruirlo.
+        recorder?.let { rec ->
+            Thread({ runBlocking { withTimeoutOrNull(2000) { rec.flush() } } }, "history-flush").start()
+        }
         if (BuildConfig.DEBUG) QueryLog.flushNow()
         recorder = null
         appResolver = null
@@ -419,12 +426,15 @@ class DnsVpnService : VpnService() {
     }
 
     private fun closeTunnel(t: Tunnel) {
-        // Cerrar el extremo de escritura despierta el poll() del lector con POLLHUP.
+        // Cerrar el extremo de escritura despierta el poll() del lector con POLLHUP. La espera a que
+        // el lector termine y el cierre de lo demás van en otro hilo, fuera del hilo principal.
         runCatching { Os.close(t.wakeWrite) }
-        t.thread?.join(1000)
-        runCatching { Os.close(t.wakeRead) }
-        runCatching { t.output.close() }
-        runCatching { t.pfd.close() }
+        Thread({
+            t.thread?.join(1000)
+            runCatching { Os.close(t.wakeRead) }
+            synchronized(t.output) { runCatching { t.output.close() } }
+            runCatching { t.pfd.close() }
+        }, "tun-close").start()
     }
 
     private fun startInForeground() {

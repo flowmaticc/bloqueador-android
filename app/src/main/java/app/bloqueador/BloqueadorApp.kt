@@ -40,8 +40,19 @@ class BloqueadorApp : Application() {
     }
 
     /** Reconstruye el motor desde disco y lo sustituye en caliente (sin tocar el túnel). */
+    /**
+     * Construye el motor con las listas del disco y lo sustituye. Si el móvil se queda sin memoria a
+     * mitad (muchas capas en un móvil con poca RAM), se sigue con el motor anterior y se avisa como
+     * error normal en vez de cerrar la app.
+     */
     suspend fun reloadEngine() {
-        engine.update(repository.load())
+        val filters = try {
+            repository.load()
+        } catch (e: OutOfMemoryError) {
+            app.bloqueador.diag.ErrorReports.record(this, "listas_memoria", e)
+            throw java.io.IOException("No hay memoria suficiente para cargar todas las listas; se mantienen las anteriores.", e)
+        }
+        engine.update(filters)
     }
 
     override fun onCreate() {

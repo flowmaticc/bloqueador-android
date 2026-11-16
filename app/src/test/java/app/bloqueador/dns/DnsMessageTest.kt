@@ -2,8 +2,10 @@ package app.bloqueador.dns
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DnsMessageTest {
@@ -83,11 +85,30 @@ class DnsMessageTest {
     }
 
     @Test
-    fun `otros tipos reciben NXDOMAIN sin respuestas`() {
+    fun `solo letras, numeros, guiones y guion bajo cuentan como nombre de host`() {
+        assertTrue(DnsMessage.parseQuery(query("_dmarc.mi-web.es", 16))!!.isHostname)
+        assertFalse(DnsMessage.parseQuery(query("hola!mundo.com", 1))!!.isHostname)
+        assertFalse(DnsMessage.parseQuery(query("a\"b.com", 1))!!.isHostname)
+    }
+
+    @Test
+    fun `respuesta de error con la pregunta repetida`() {
+        val q = query("ejemplo.com", 1)
+        val r = DnsMessage.buildErrorResponse(q, DnsMessage.RCODE_SERVFAIL)
+        assertEquals(DnsMessage.RCODE_SERVFAIL, DnsMessage.u16(r, 2) and 0xF)
+        assertEquals(1, DnsMessage.u16(r, 4))
+        assertEquals(0, DnsMessage.u16(r, 6))
+        assertEquals(DnsMessage.u16(q, 0), DnsMessage.u16(r, 0))
+        assertEquals("ejemplo.com", DnsMessage.parseQuestion(r)!!.name)
+    }
+
+    @Test
+    fun `otros tipos reciben NODATA (NOERROR sin respuestas), no NXDOMAIN`() {
         val q = query("ads.com", 65) // HTTPS
         val question = DnsMessage.parseQuery(q)!!
         val r = DnsMessage.buildBlockedResponse(q, question)
-        assertEquals(DnsMessage.RCODE_NXDOMAIN, DnsMessage.u16(r, 2) and 0xF)
+        assertEquals(0, DnsMessage.u16(r, 2) and 0xF)
+        assertEquals(0x8000, DnsMessage.u16(r, 2) and 0x8000)
         assertEquals(0, DnsMessage.u16(r, 6))
         assertEquals(question.end, r.size)
         assertNotNull(DnsMessage.parseQuery(q))

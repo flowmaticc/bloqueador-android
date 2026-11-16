@@ -1,5 +1,6 @@
 package app.bloqueador.ui
 
+import app.bloqueador.settings.AppSettings
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.net.Uri
@@ -298,12 +299,12 @@ private fun PreviewPage(event: HistoryEvent, url: String, onDismiss: () -> Unit)
                 val allowed = settings.allowedDomains.contains(event.domain)
                 if (event.blocked && !allowed) {
                     Button(onClick = {
-                        apply("${event.domain} permitido") { settings.allowedDomains = settings.allowedDomains + event.domain }
+                        apply("${event.domain} permitido") { settings.allowedDomains = settings.allowedDomains + listOfNotNull(AppSettings.cleanDomain(event.domain)) }
                     }) { Text("Permitir siempre") }
                     OutlinedButton(onClick = onDismiss) { Text("Mantener bloqueado") }
                 } else if (!event.blocked) {
                     Button(onClick = {
-                        apply("${event.domain} bloqueado") { settings.blockedDomains = settings.blockedDomains + event.domain }
+                        apply("${event.domain} bloqueado") { settings.blockedDomains = settings.blockedDomains + listOfNotNull(AppSettings.cleanDomain(event.domain)) }
                     }) { Text("Bloquear siempre") }
                     OutlinedButton(onClick = onDismiss) { Text("Dejarlo así") }
                 }

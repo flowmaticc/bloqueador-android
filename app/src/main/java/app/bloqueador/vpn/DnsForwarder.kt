@@ -32,7 +32,10 @@ import java.util.concurrent.atomic.AtomicInteger
  *
  * Si el servidor preferido deja de responder ([FAILOVER_AFTER] consultas seguidas sin respuesta), se
  * pasa al siguiente de la lista. Se vuelve al preferido al cambiar de red o pasados [PRIMARY_RETRY_MS].
- * Nunca hay más de [MAX_PENDING] consultas en vuelo.
+ * Al cambiar de red se abre un socket nuevo (con otro puerto de origen).
+ *
+ * Nunca hay más de [MAX_PENDING] consultas en vuelo, ni más de [MAX_PENDING_PER_APP] de una misma app:
+ * una app que inunda el DNS recibe SERVFAIL al pasarse, y las demás siguen resolviendo.
  *
  * Respuestas truncadas (bit TC, demasiado grandes para UDP): el cliente reintentaría por TCP contra el
  * DNS virtual del túnel, que solo atiende UDP. Por eso se pide la respuesta completa al DNS real por TCP
@@ -52,9 +55,11 @@ class DnsForwarder(
         val query: ByteArray,
         val server: InetAddress,
         val domain: String,
+        val app: String,
     )
 
     private val pending = ConcurrentHashMap<Int, Pending>()
+    private val perApp = ConcurrentHashMap<String, AtomicInteger>()
     private val random = SecureRandom()
     private val unanswered = AtomicInteger()
     private val serverShift = AtomicInteger()
@@ -78,10 +83,15 @@ class DnsForwarder(
     private var tcpWorker: ExecutorService? = null
 
     fun start() {
+        tcpWorker = Executors.newSingleThreadExecutor { Thread(it, "dns-tcp") }
+        openSocket()
+    }
+
+    /** Abre el socket de reenvío (protegido: sale por la red real) y su hilo receptor. */
+    private fun openSocket() {
         val s = DatagramSocket()
         if (!protect(s)) Log.w(TAG, "No se pudo proteger el socket de reenvío")
         socket = s
-        tcpWorker = Executors.newSingleThreadExecutor { Thread(it, "dns-tcp") }
         receiver = Thread({ receiveLoop(s) }, "dns-forwarder").also { it.start() }
     }
 
@@ -92,16 +102,27 @@ class DnsForwarder(
         tcpWorker?.shutdownNow()
         tcpWorker = null
         pending.clear()
+        perApp.clear()
     }
 
-    /** Envía [request] (consulta ya analizada, de [domain]) al servidor DNS preferido. */
-    fun forward(request: UdpPacket, domain: String) {
-        val s = socket ?: return
+    /**
+     * Envía [request] (consulta ya analizada, de [domain]) al servidor DNS preferido. [app] identifica
+     * a quien preguntó (paquete, o null si no se sabe) para el cupo por app.
+     */
+    fun forward(request: UdpPacket, domain: String, app: String? = null) {
+        if (socket == null) return
         val servers = upstream()
         if (servers.isEmpty()) return
         val now = System.currentTimeMillis()
         if (servers != lastServers) {
-            // Otra red u otros servidores: se empieza de nuevo por el preferido.
+            // Otra red u otros servidores: se empieza de nuevo por el preferido, con un socket nuevo.
+            // Las consultas en vuelo por la red anterior ya no tendrían respuesta: el cliente reintenta.
+            if (lastServers.isNotEmpty()) {
+                socket?.close()
+                pending.clear()
+                perApp.clear()
+                openSocket()
+            }
             lastServers = servers
             serverShift.set(0)
             unanswered.set(0)
@@ -111,25 +132,38 @@ class DnsForwarder(
             unanswered.set(0)
         }
         if (pending.size > CLEANUP_THRESHOLD || unanswered.get() >= FAILOVER_AFTER) expire(now, servers.size)
-        // Límite de memoria: si una app inunda de consultas sin respuesta, se descartan las nuevas
-        // (el cliente reintentará) en lugar de acumularlas.
-        if (pending.size >= MAX_PENDING) return
+        val key = app ?: UNKNOWN_APP
+        val query = request.payload()
+        // Límite de memoria y de reparto: si una app inunda de consultas sin respuesta, recibe SERVFAIL
+        // (deja de esperar) en lugar de acumularlas y dejar sin hueco a las demás.
+        if (pending.size >= MAX_PENDING || (perApp[key]?.get() ?: 0) >= MAX_PENDING_PER_APP) {
+            reply(IpPacket.buildUdpReply(request, DnsMessage.buildErrorResponse(query, DnsMessage.RCODE_SERVFAIL)))
+            return
+        }
         val server = servers[Math.floorMod(serverShift.get(), servers.size)]
 
-        val query = request.payload()
         val originalId = DnsMessage.u16(query, 0)
-        val id = allocateId() ?: return // 65.536 consultas en vuelo: imposible en la práctica
+        val p = Pending(request, originalId, now, query, server, domain, key)
+        val id = reserveId(p) ?: return // 65.536 consultas en vuelo: imposible en la práctica
         DnsMessage.put16(query, 0, id)
-        pending[id] = Pending(request, originalId, now, query, server, domain)
+        perApp.getOrPut(key) { AtomicInteger() }.incrementAndGet()
         unanswered.incrementAndGet()
         try {
+            val s = socket ?: throw IOException("socket cerrado")
             s.send(DatagramPacket(query, query.size, server, port))
             lastSentAt = now
             if (waitingSince == 0L) waitingSince = now
         } catch (e: IOException) {
-            pending.remove(id)
+            take(id)
             Log.d(TAG, "No se pudo enviar a ${server.hostAddress}: ${e.message}")
         }
+    }
+
+    /** Saca una consulta de las pendientes (y del cupo de su app). null si ya no estaba. */
+    private fun take(id: Int): Pending? {
+        val p = pending.remove(id) ?: return null
+        perApp[p.app]?.decrementAndGet()
+        return p
     }
 
     private fun receiveLoop(s: DatagramSocket) {
@@ -145,7 +179,7 @@ class DnsForwarder(
                 if (packet.address != p.server) continue
                 val response = buffer.copyOf(packet.length)
                 if (!sameQuestion(p.query, response)) continue
-                if (pending.remove(id) == null) continue
+                if (take(id) == null) continue
                 unanswered.set(0)
                 waitingSince = 0L
                 if (isTruncated(response)) {
@@ -191,18 +225,21 @@ class DnsForwarder(
         reply(IpPacket.buildUdpReply(p.request, response))
     }
 
-    /** Identificador aleatorio que no esté en vuelo (un atacante no puede predecir el siguiente). */
-    private fun allocateId(): Int? {
+    /**
+     * Reserva un identificador aleatorio libre para [p] (un atacante no puede predecir el siguiente).
+     * `putIfAbsent` comprueba y reserva a la vez: dos envíos simultáneos nunca comparten identificador.
+     */
+    private fun reserveId(p: Pending): Int? {
         repeat(64) {
             val id = random.nextInt(0x10000)
-            if (!pending.containsKey(id)) return id
+            if (pending.putIfAbsent(id, p) == null) return id
         }
-        return (0 until 0x10000).firstOrNull { !pending.containsKey(it) }
+        return (0 until 0x10000).firstOrNull { pending.putIfAbsent(it, p) == null }
     }
 
     /** Descarta lo caducado y, si el servidor preferido no contesta, pasa al siguiente. */
     private fun expire(now: Long, serverCount: Int) {
-        pending.entries.removeIf { now - it.value.sentAt > TIMEOUT_MS }
+        pending.entries.filter { now - it.value.sentAt > TIMEOUT_MS }.forEach { take(it.key) }
         if (unanswered.get() >= FAILOVER_AFTER && serverCount > 1) {
             val oldest = pending.values.minOfOrNull { it.sentAt } ?: now
             // Solo si de verdad lleva un rato sin contestar (no por una ráfaga de consultas).
@@ -229,7 +266,10 @@ class DnsForwarder(
 
     companion object {
         private const val TAG = "DnsForwarder"
-        private const val MAX_PACKET = 4096
+        /** El máximo de un datagrama UDP: con EDNS0 un servidor puede mandar más de 4 KB. */
+        private const val MAX_PACKET = 65_535
+        private const val UNKNOWN_APP = "?"
+        internal const val MAX_PENDING_PER_APP = 256
         private const val MAX_TCP_RESPONSE = 16 * 1024
         private const val TIMEOUT_MS = 5_000L
         private const val CLEANUP_THRESHOLD = 256
@@ -250,8 +290,10 @@ class DnsForwarder(
          */
         internal fun sameQuestion(query: ByteArray, response: ByteArray): Boolean {
             if (response.size < 12 || (response[2].toInt() and 0x80) == 0) return false
-            // Algunos servidores devuelven los errores sin repetir la pregunta.
-            if (DnsMessage.u16(response, 4) == 0) return (response[3].toInt() and 0x0F) != 0
+            // Sin pregunta solo se acepta FORMERR ("no entiendo tu consulta", que no puede repetirla).
+            // Cualquier otra respuesta sin pregunta podría ser falsa: un atacante solo tendría que
+            // acertar el identificador. Coste: un SERVFAIL sin pregunta hace esperar al cliente.
+            if (DnsMessage.u16(response, 4) == 0) return (response[3].toInt() and 0x0F) == DnsMessage.RCODE_FORMERR
             val q = DnsMessage.parseQuestion(query) ?: return false
             val r = DnsMessage.parseQuestion(response) ?: return false
             return q.name == r.name && q.type == r.type && q.dnsClass == r.dnsClass
