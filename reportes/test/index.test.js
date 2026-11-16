@@ -1,23 +1,57 @@
 // Tests del servicio de reportes. Ejecutar desde reportes/: npm test
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import worker, { limpiarDominio, limpiarNota, limpiarInforme, limpiarCampo, firmaDeError } from "../src/index.js";
+import worker, {
+  limpiarDominio, limpiarNota, limpiarInforme, limpiarCampo, firmaDeError, conexion,
+  SQL_SUMAR, SQL_LIMPIAR, SQL_ISSUE, SQL_GUARDAR_ISSUE,
+} from "../src/index.js";
 
-/** Entorno falso: almacén KV en memoria y GitHub simulado (se sustituye fetch). */
-function entorno({ issuesAbiertas = [] } = {}) {
-  const kv = new Map();
+/** D1 falsa en memoria: entiende solo las sentencias del servicio (cualquier otra es un error). */
+function d1Falsa({ falla = false } = {}) {
+  const limites = new Map(); // clave → { n, caduca }
+  const issues = new Map(); // titulo → numero
+  const ejecutar = async (sql, a) => {
+    if (falla) throw new Error("D1 caída");
+    switch (sql) {
+      case SQL_SUMAR: {
+        const f = limites.get(a[0]);
+        const n = (f ? f.n : 0) + a[1];
+        limites.set(a[0], { n, caduca: f ? f.caduca : a[2] });
+        return { n };
+      }
+      case SQL_LIMPIAR:
+        for (const [k, f] of limites) if (f.caduca < a[0]) limites.delete(k);
+        return null;
+      case SQL_ISSUE:
+        return issues.has(a[0]) ? { numero: issues.get(a[0]) } : null;
+      case SQL_GUARDAR_ISSUE:
+        issues.set(a[0], a[1]);
+        return null;
+      default:
+        throw new Error(`SQL inesperada: ${sql}`);
+    }
+  };
+  const db = {
+    prepare: (sql) => ({
+      bind: (...a) => ({ first: () => ejecutar(sql, a), run: () => ejecutar(sql, a) }),
+    }),
+  };
+  return { db, limites, issues };
+}
+
+/** Entorno falso: D1 en memoria y GitHub simulado (se sustituye fetch). */
+function entorno({ issues = {}, falla = false, comentarioFalla = null } = {}) {
+  const { db, limites, issues: tabla } = d1Falsa({ falla });
+  for (const [t, n] of Object.entries(issues)) tabla.set(t, n);
   const llamadas = [];
+  let siguiente = 100;
   globalThis.fetch = async (url, init = {}) => {
     llamadas.push({ url: String(url), method: init.method || "GET", body: init.body ? JSON.parse(init.body) : null });
-    if (String(url).includes("/search/issues")) return Response.json({ items: issuesAbiertas });
-    return Response.json({ number: 99 });
+    if (comentarioFalla && String(url).endsWith("/comments")) return new Response("", { status: comentarioFalla });
+    return Response.json({ number: siguiente++ });
   };
-  const env = {
-    REPO: "org/repo",
-    GITHUB_TOKEN: "x",
-    LIMITS: { get: async (k) => kv.get(k) ?? null, put: async (k, v) => void kv.set(k, v) },
-  };
-  return { env, llamadas, kv };
+  const env = { REPO: "org/repo", GITHUB_TOKEN: "x", DB: db };
+  return { env, llamadas, limites, issues: tabla };
 }
 
 const post = (body, ip = "203.0.113.7") =>
@@ -57,10 +91,63 @@ test("un reporte válido crea un issue con el dominio como título", async () =>
 });
 
 test("si el dominio ya está abierto se añade un comentario en vez de duplicarlo", async () => {
-  const { env, llamadas } = entorno({ issuesAbiertas: [{ title: "ads.ejemplo.com", number: 7 }] });
+  const { env, llamadas } = entorno({ issues: { "ads.ejemplo.com": 7 } });
   await worker.fetch(post({ dominio: "ads.ejemplo.com", motivo: "rota", origen: "web" }), env);
   assert.ok(llamadas.some((l) => l.url.endsWith("/issues/7/comments")));
   assert.ok(!llamadas.some((l) => l.method === "POST" && l.url.endsWith("/repos/org/repo/issues")));
+  assert.ok(!llamadas.some((l) => l.url.includes("/search/")), "ya no se usa la Search API");
+});
+
+test("el segundo reporte del mismo dominio comenta en la incidencia que creó el primero", async () => {
+  const { env, llamadas, issues } = entorno();
+  await worker.fetch(post({ dominio: "nuevo.ejemplo.com" }), env);
+  assert.equal(issues.get("nuevo.ejemplo.com"), 100);
+  await worker.fetch(post({ dominio: "nuevo.ejemplo.com" }, "198.51.100.2"), env);
+  assert.ok(llamadas.some((l) => l.url.endsWith("/issues/100/comments")));
+  assert.equal(llamadas.filter((l) => l.url.endsWith("/repos/org/repo/issues")).length, 1);
+});
+
+test("si la incidencia guardada ya no existe en GitHub, se crea otra y se apunta su número", async () => {
+  const { env, llamadas, issues } = entorno({ issues: { "ads.ejemplo.com": 7 }, comentarioFalla: 404 });
+  const r = await worker.fetch(post({ dominio: "ads.ejemplo.com" }), env);
+  assert.equal(r.status, 200);
+  assert.ok(llamadas.some((l) => l.method === "POST" && l.url.endsWith("/repos/org/repo/issues")));
+  assert.equal(issues.get("ads.ejemplo.com"), 100);
+});
+
+test("si la base de datos falla, responde 429 y no llama a GitHub (nunca 500)", async () => {
+  const { env, llamadas } = entorno({ falla: true });
+  assert.equal((await worker.fetch(post({ dominio: "ejemplo.com" }), env)).status, 429);
+  assert.equal((await worker.fetch(postError(informe()), env)).status, 429);
+  assert.equal(llamadas.length, 0);
+});
+
+test("30 envíos seguidos desde una conexión: 20 aceptados y 10 con 429, ninguno 500", async () => {
+  const { env } = entorno();
+  const estados = await Promise.all(Array.from({ length: 30 }, (_, i) => worker.fetch(post({ dominio: `d${i}.ejemplo.com` }), env).then((r) => r.status)));
+  assert.equal(estados.filter((s) => s === 200).length, 20);
+  assert.equal(estados.filter((s) => s === 429).length, 10);
+});
+
+test("IPv6: toda la red /64 cuenta como una conexión; IPv4 se toma entera", async () => {
+  assert.equal(conexion("2a0c:5a87:7d81:ac00:5ca8:15ff:fede:d756"), "2a0c:5a87:7d81:ac00::/64");
+  assert.equal(conexion("2A0C:5A87:7D81:AC00::1"), "2a0c:5a87:7d81:ac00::/64");
+  assert.equal(conexion("2001:db8::1"), "2001:db8:0:0::/64");
+  assert.equal(conexion("203.0.113.7"), "203.0.113.7");
+  assert.equal(conexion(null), "desconocida");
+  const { env } = entorno();
+  for (let i = 0; i < 20; i++) await worker.fetch(post({ dominio: `d${i}.ejemplo.com` }, `2a0c:5a87:7d81:ac00::${i + 1}`), env);
+  assert.equal((await worker.fetch(post({ dominio: "x.ejemplo.com" }, "2a0c:5a87:7d81:ac00:ffff::9"), env)).status, 429);
+  assert.equal((await worker.fetch(post({ dominio: "x.ejemplo.com" }, "2a0c:5a87:7d81:ac01::1"), env)).status, 200);
+});
+
+test("la tarea diaria borra los contadores caducados", async () => {
+  const { env, limites } = entorno();
+  limites.set("viejo", { n: 3, caduca: 1 });
+  await worker.fetch(post({ dominio: "ejemplo.com" }), env);
+  await worker.scheduled({}, env);
+  assert.ok(!limites.has("viejo"));
+  assert.ok(limites.size >= 2);
 });
 
 test("rechaza dominios no válidos, cuerpos enormes y JSON roto sin llamar a GitHub", async () => {
@@ -88,12 +175,12 @@ test("el campo trampa del formulario descarta el envío sin guardar nada", async
 });
 
 test("límite de 20 reportes por conexión y día, sin guardar la IP", async () => {
-  const { env, kv } = entorno();
+  const { env, limites } = entorno();
   for (let i = 0; i < 20; i++) assert.equal((await worker.fetch(post({ dominio: `d${i}.ejemplo.com` }), env)).status, 200);
   assert.equal((await worker.fetch(post({ dominio: "otro.ejemplo.com" }), env)).status, 429);
   // Otra conexión sí puede.
   assert.equal((await worker.fetch(post({ dominio: "otro.ejemplo.com" }, "198.51.100.9"), env)).status, 200);
-  assert.ok(![...kv.keys()].some((k) => k.includes("203.0.113.7")));
+  assert.ok(![...limites.keys()].some((k) => k.includes("203.0.113.7")));
 });
 
 test("solo acepta POST /reportar y responde a la comprobación de CORS", async () => {
@@ -104,12 +191,14 @@ test("solo acepta POST /reportar y responde a la comprobación de CORS", async (
   assert.equal(pre.headers.get("Access-Control-Allow-Origin"), "https://flowmaticc.github.io");
 });
 
-test("si GitHub falla, responde 502 sin detalles internos", async () => {
+test("si GitHub falla, responde 502 con su código pero sin detalles internos", async () => {
   const { env } = entorno();
-  globalThis.fetch = async () => new Response("secreto interno", { status: 500 });
+  globalThis.fetch = async () => new Response("secreto interno", { status: 403 });
   const r = await worker.fetch(post({ dominio: "ejemplo.com" }), env);
   assert.equal(r.status, 502);
-  assert.ok(!(await r.text()).includes("secreto"));
+  const texto = await r.text();
+  assert.ok(!texto.includes("secreto"));
+  assert.ok(texto.includes("GitHub 403"));
 });
 
 // --- Informes de errores anónimos ---
@@ -166,7 +255,7 @@ test("un informe nuevo crea una incidencia con etiqueta error y todo en bloques 
 
 test("si el error ya está abierto se añade un comentario", async () => {
   const titulo = `Error: listas_descarga · ${await firmaDeError(limpiarInforme(informe()).errores[0])}`;
-  const { env, llamadas } = entorno({ issuesAbiertas: [{ title: titulo, number: 12 }] });
+  const { env, llamadas } = entorno({ issues: { [titulo]: 12 } });
   await worker.fetch(postError(informe()), env);
   assert.ok(llamadas.some((l) => l.url.endsWith("/issues/12/comments")));
   assert.ok(!llamadas.some((l) => l.method === "POST" && l.url.endsWith("/repos/org/repo/issues")));
@@ -178,6 +267,15 @@ test("informes no válidos, enormes o en exceso no llegan a GitHub", async () =>
   assert.equal((await worker.fetch(postError(informe({ android: "x" })), env)).status, 400);
   assert.equal((await worker.fetch(postError(JSON.stringify(informe({ relleno: "x".repeat(9000) }))), env)).status, 413);
   assert.equal(llamadas.length, 0);
-  for (let i = 0; i < 5; i++) assert.equal((await worker.fetch(postError(informe(), "198.51.100.1"), env)).status, 200);
+  for (let i = 0; i < 20; i++) assert.equal((await worker.fetch(postError(informe(), "198.51.100.1"), env)).status, 200);
   assert.equal((await worker.fetch(postError(informe(), "198.51.100.1"), env)).status, 429);
+});
+
+test("el límite de informes cuenta errores, no envíos", async () => {
+  const { env } = entorno();
+  const diez = informe({ errores: Array.from({ length: 10 }, (_, n) => ({ tipo: "cierre", detalle: `d${n}` })) });
+  assert.equal((await worker.fetch(postError(diez, "198.51.100.3"), env)).status, 200);
+  assert.equal((await worker.fetch(postError(diez, "198.51.100.3"), env)).status, 200);
+  // 20 errores ya contados: uno más supera el cupo diario de la conexión.
+  assert.equal((await worker.fetch(postError(informe(), "198.51.100.3"), env)).status, 429);
 });

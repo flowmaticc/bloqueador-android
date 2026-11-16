@@ -7,7 +7,17 @@ compatibility_date = "2026-10-01"
 [vars]
 REPO = "flowmaticc/garbillo-reportes"
 
-# Límite de envíos por conexión y día. El id lo da: npx wrangler kv namespace create LIMITS
-[[kv_namespaces]]
-binding = "LIMITS"
-id = "15a177e3396f44cc9e904e87ab7ad985"
+# Límites de envío y títulos → número de incidencia (schema.sql).
+# El id lo da: npx wrangler d1 create garbillo-reportes
+[[d1_databases]]
+binding = "DB"
+database_name = "garbillo-reportes"
+database_id = "PENDIENTE-wrangler-d1-create"
+
+# Borra cada día los contadores caducados.
+[triggers]
+crons = ["17 3 * * *"]
+
+# Sin registros de peticiones en Cloudflare: el servicio no debe guardar IPs ni contenido.
+[observability]
+enabled = false
