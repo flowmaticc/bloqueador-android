@@ -85,6 +85,11 @@ class AppSettings(context: Context) {
         get() = if (prefs.contains("always_on_vpn")) prefs.getBoolean("always_on_vpn", false) else null
         set(v) = prefs.edit().apply { if (v == null) remove("always_on_vpn") else putBoolean("always_on_vpn", v) }.apply()
 
+    /** DNS cifrado (DoT) con un servicio de la lista, o null para usar el DNS de la red (por defecto). */
+    var encryptedDns: app.bloqueador.vpn.DotProvider?
+        get() = app.bloqueador.vpn.DotProvider.entries.firstOrNull { it.name == prefs.getString("encrypted_dns", null) }
+        set(v) = prefs.edit().putString("encrypted_dns", v?.name).apply()
+
     /** Android tiene activado "Bloquear conexiones sin VPN" (con Garbillo deja el móvil sin internet). */
     var vpnLockdown: Boolean
         get() = prefs.getBoolean("vpn_lockdown", false)

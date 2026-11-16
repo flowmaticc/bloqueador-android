@@ -18,6 +18,7 @@ class UpstreamDns(context: Context) {
 
     private val cm = context.getSystemService(ConnectivityManager::class.java)
     private val servers = LinkedHashMap<Network, List<InetAddress>>()
+    private val validated = HashMap<Network, Boolean>()
 
     @Volatile
     var lastNetwork: Network? = null
@@ -32,9 +33,17 @@ class UpstreamDns(context: Context) {
             }
         }
 
+        override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+            synchronized(servers) {
+                validated[network] = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) &&
+                    !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_CAPTIVE_PORTAL)
+            }
+        }
+
         override fun onLost(network: Network) {
             synchronized(servers) {
                 servers.remove(network)
+                validated.remove(network)
                 if (lastNetwork == network) lastNetwork = servers.keys.lastOrNull()
             }
         }
@@ -57,6 +66,12 @@ class UpstreamDns(context: Context) {
      * El respaldo (Quad9) solo si la red no anuncia ningún DNS: así los nombres internos de la red
      * (router, impresoras, intranets) nunca salen a un tercero.
      */
+    /**
+     * ¿Ha comprobado Android que la red actual tiene internet de verdad? false con un portal cautivo sin
+     * iniciar sesión. Si aún no se sabe, se da por buena (para no desactivar el cifrado sin motivo).
+     */
+    fun isValidated(): Boolean = synchronized(servers) { lastNetwork?.let { validated[it] } ?: true }
+
     fun current(): List<InetAddress> {
         val list = synchronized(servers) { servers[lastNetwork] ?: servers.values.lastOrNull() } ?: emptyList()
         return choose(list)

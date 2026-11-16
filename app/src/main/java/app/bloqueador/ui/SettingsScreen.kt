@@ -68,6 +68,7 @@ enum class SettingsSection(val title: String, val group: String) {
     LAYERS("Listas adicionales", "Protección"),
     APPS("Apps protegidas", "Protección"),
     RULES("Mis excepciones y bloqueos", "Protección"),
+    ENCRYPTED_DNS("DNS cifrado", "Protección"),
     LIST_UPDATES("Actualización de listas", "Funcionamiento"),
     HISTORY("Historial", "Funcionamiento"),
     BATTERY("Batería y arranque", "Funcionamiento"),
@@ -93,6 +94,7 @@ fun settingsIndex(manufacturer: String?): List<SettingEntry> = buildList {
     add(SettingEntry(SettingsSection.APPS, "Restaurar recomendado", "banca pagos por defecto"))
     add(SettingEntry(SettingsSection.RULES, "Permitir siempre un dominio", "excepciones exclusiones lista blanca whitelist desbloquear"))
     add(SettingEntry(SettingsSection.RULES, "Bloquear siempre un dominio", "bloqueos propios lista negra blacklist"))
+    add(SettingEntry(SettingsSection.ENCRYPTED_DNS, "DNS cifrado", "dot tls privado cifrar quad9 cloudflare mullvad operador espiar resolver servidor dns 853"))
     add(SettingEntry(SettingsSection.LIST_UPDATES, "Frecuencia de actualización de listas", "12 24 horas manual automatica descargar"))
     add(SettingEntry(SettingsSection.LIST_UPDATES, "Comprobar listas ahora", "actualizar descargar ya"))
     add(SettingEntry(SettingsSection.LIST_UPDATES, "Descargar solo con wifi", "wifi datos moviles red medida consumo descargas tarifa"))
@@ -229,6 +231,7 @@ private fun sectionSummary(s: SettingsSection, settings: AppSettings): String {
         }
         SettingsSection.APPS -> strategySummary(settings)
         SettingsSection.RULES -> "${settings.allowedDomains.size} permitidos · ${settings.blockedDomains.size} bloqueados"
+        SettingsSection.ENCRYPTED_DNS -> settings.encryptedDns?.let { "Activado · ${it.label}" } ?: "Desactivado · DNS de tu red"
         SettingsSection.LIST_UPDATES -> settings.updateFrequency.label +
             (app.repository.lastUpdated.takeIf { it > 0 }?.let { " · actualizadas " + relativeTime(it) } ?: "")
         SettingsSection.HISTORY -> if (settings.historyEnabled) "Activado · ${settings.historyRetention.label}" else "Desactivado"
@@ -310,6 +313,7 @@ private fun SectionScreen(
             SettingsSection.LAYERS -> LayersSection { on, revert -> applyLists(download = on, revert.takeIf { on }) }
             SettingsSection.APPS -> AppsSection(onChangeStrategy, onEditApps)
             SettingsSection.RULES -> RulesSection { applyLists(download = false) }
+            SettingsSection.ENCRYPTED_DNS -> EncryptedDnsSection()
             SettingsSection.LIST_UPDATES -> ListUpdatesSection()
             SettingsSection.HISTORY -> HistorySection()
             SettingsSection.BATTERY -> BatterySection()
@@ -635,6 +639,40 @@ private fun HistorySection() {
                 Toast.makeText(context, "Historial borrado", Toast.LENGTH_SHORT).show()
             }
         }) { Text("Borrar historial ahora") }
+    }
+}
+
+@Composable
+private fun EncryptedDnsSection() {
+    val settings = BloqueadorApp.instance.settings
+    var selected by remember { mutableStateOf(settings.encryptedDns) }
+    SectionCard("DNS cifrado") {
+        Text(
+            "Normalmente, las consultas que Garbillo deja pasar van sin cifrar al DNS de tu red (el de tu " +
+                "operador o tu router), que puede verlas. Con el DNS cifrado van por TLS a un servicio de " +
+                "confianza: nadie en la red ve ni cambia qué webs visitas.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        RadioRow(
+            selected = selected == null,
+            title = "Desactivado (DNS de tu red)",
+            description = "Lo de siempre. Funciona en cualquier red.",
+            onClick = { selected = null; settings.encryptedDns = null },
+        )
+        app.bloqueador.vpn.DotProvider.entries.forEach { p ->
+            RadioRow(
+                selected = selected == p,
+                title = p.label,
+                description = p.description,
+                onClick = { selected = p; settings.encryptedDns = p },
+            )
+        }
+        Text(
+            "En una wifi con página de acceso (hoteles, aeropuertos) se usa el DNS de la red hasta que " +
+                "inicias sesión. Si una red bloquea el DNS cifrado, Garbillo avisará de que el DNS no " +
+                "responde: elige otro servicio o desactívalo en esa red.",
+            style = MaterialTheme.typography.bodySmall,
+        )
     }
 }
 

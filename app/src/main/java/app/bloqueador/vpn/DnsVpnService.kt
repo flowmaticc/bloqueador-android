@@ -82,7 +82,7 @@ class DnsVpnService : VpnService() {
     private var tunnel: Tunnel? = null
     private var upstream: UpstreamDns? = null
     @Volatile
-    private var forwarder: DnsForwarder? = null
+    private var forwarder: DnsResolver? = null
     @Volatile
     private var recorder: HistoryRecorder? = null
     @Volatile
@@ -146,11 +146,17 @@ class DnsVpnService : VpnService() {
         app.engine.resetCounters()
         val up = UpstreamDns(this).also { it.start() }
         upstream = up
-        val fwd = DnsForwarder(
+        val udp = DnsForwarder(
             protect = { protect(it) },
             protectTcp = { protect(it) },
             upstream = { up.current() },
             reply = ::write,
+        )
+        val fwd = ResolverRouter(
+            udp = udp,
+            provider = { app.settings.encryptedDns },
+            networkValidated = { up.isValidated() },
+            createDot = { p -> DotResolver.forProvider(p, protect = { protect(it) }, reply = ::write) },
         ).also { it.start() }
         forwarder = fwd
         app.dnsUnresponsive = { fwd.isUnresponsive() }

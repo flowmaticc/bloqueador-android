@@ -47,7 +47,7 @@ class DnsForwarder(
     private val upstream: () -> List<InetAddress>,
     private val reply: (ByteArray) -> Unit,
     private val port: Int = 53,
-) {
+) : DnsResolver {
     private class Pending(
         val request: UdpPacket,
         val originalId: Int,
@@ -82,7 +82,7 @@ class DnsForwarder(
     private var receiver: Thread? = null
     private var tcpWorker: ExecutorService? = null
 
-    fun start() {
+    override fun start() {
         tcpWorker = Executors.newSingleThreadExecutor { Thread(it, "dns-tcp") }
         openSocket()
     }
@@ -95,7 +95,7 @@ class DnsForwarder(
         receiver = Thread({ receiveLoop(s) }, "dns-forwarder").also { it.start() }
     }
 
-    fun stop() {
+    override fun stop() {
         socket?.close() // desbloquea receive() con una excepción y el hilo termina
         socket = null
         receiver = null
@@ -109,7 +109,7 @@ class DnsForwarder(
      * Envía [request] (consulta ya analizada, de [domain]) al servidor DNS preferido. [app] identifica
      * a quien preguntó (paquete, o null si no se sabe) para el cupo por app.
      */
-    fun forward(request: UdpPacket, domain: String, app: String? = null) {
+    override fun forward(request: UdpPacket, domain: String, app: String?) {
         if (socket == null) return
         val servers = upstream()
         if (servers.isEmpty()) return
@@ -197,6 +197,7 @@ class DnsForwarder(
     private fun answerOverTcp(p: Pending, truncated: ByteArray) {
         val full = try {
             Socket().use { sock ->
+                sock.bind(null) // protect() necesita el socket ya creado en el sistema (ver DotResolver)
                 if (!protectTcp(sock)) Log.w(TAG, "No se pudo proteger el socket TCP")
                 sock.soTimeout = TCP_TIMEOUT_MS
                 sock.connect(InetSocketAddress(p.server, port), TCP_TIMEOUT_MS)
@@ -253,13 +254,13 @@ class DnsForwarder(
     }
 
     /** Consultas en vuelo (para el registro interno de pruebas). */
-    val inFlight: Int get() = pending.size
+    override val inFlight: Int get() = pending.size
 
     /**
      * true si se están enviando consultas pero ningún servidor contesta desde hace [SILENT_ALERT_MS]
      * (sin conexión real, o la red bloquea el DNS). Sin consultas recientes no se considera un problema.
      */
-    fun isUnresponsive(now: Long = System.currentTimeMillis()): Boolean {
+    override fun isUnresponsive(now: Long): Boolean {
         val since = waitingSince
         return since > 0 && now - since > SILENT_ALERT_MS && now - lastSentAt < RECENT_MS
     }
