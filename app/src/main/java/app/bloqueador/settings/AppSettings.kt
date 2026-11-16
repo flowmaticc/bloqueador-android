@@ -116,9 +116,7 @@ class AppSettings(context: Context) {
 
     /** Canal de actualizaciones de la propia app (Estable por defecto). */
     var updateChannel: app.bloqueador.appupdate.UpdateChannel
-        get() = app.bloqueador.appupdate.UpdateChannel.entries
-            .firstOrNull { it.name == prefs.getString("update_channel", null) }
-            ?: app.bloqueador.appupdate.UpdateChannel.STABLE
+        get() = app.bloqueador.appupdate.UpdateChannel.fromSaved(prefs.getString("update_channel", null))
         set(v) = prefs.edit().putString("update_channel", v.name).apply()
 
     var lastAppUpdateCheck: Long

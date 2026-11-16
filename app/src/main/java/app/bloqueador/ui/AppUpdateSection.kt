@@ -125,6 +125,14 @@ fun AppUpdateSection() {
 
         available?.let { info ->
             Text("Nueva versión disponible: ${info.versionName}", style = MaterialTheme.typography.titleSmall)
+            if (info.isUrgentFor(updater.installedVersionCode)) {
+                Text(
+                    "Importante: tu versión tiene un fallo de seguridad corregido en esta. Instálala cuanto antes.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
+            }
+            info.notice?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
             if (info.notes.isNotBlank()) {
                 // Entera; solo si fuera muy larga se corta, y siempre al final de una línea.
                 val notes = if (info.notes.length <= 2000) info.notes

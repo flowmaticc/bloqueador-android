@@ -54,6 +54,11 @@ android {
             "String", "UPDATE_API_BASE",
             "\"${(findProperty("updateApiBase") as String?) ?: "https://api.github.com"}\"",
         )
+        // Donde están los update.json estáticos y los APK (-PupdateDownloadBase=http://127.0.0.1:8000 en pruebas).
+        buildConfigField(
+            "String", "UPDATE_DOWNLOAD_BASE",
+            "\"${(findProperty("updateDownloadBase") as String?) ?: "https://github.com"}\"",
+        )
     }
 
     signingConfigs {
@@ -63,6 +68,11 @@ android {
                 storePassword = signingProps.getProperty("storePassword")
                 keyAlias = signingProps.getProperty("keyAlias")
                 keyPassword = signingProps.getProperty("keyPassword")
+                // v2 (Android 7+) y v3 (Android 9+): v3 permitiría rotar la clave en el futuro sin
+                // obligar a desinstalar. v1 no hace falta con minSdk 26.
+                enableV1Signing = false
+                enableV2Signing = true
+                enableV3Signing = true
             }
         }
     }

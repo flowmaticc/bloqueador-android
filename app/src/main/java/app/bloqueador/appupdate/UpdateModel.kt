@@ -5,16 +5,26 @@ import org.json.JSONObject
 import java.time.Instant
 
 /**
- * Canal de actualizaciones de la app (como en navegadores y sistemas operativos):
- * cada canal incluye también todo lo de los canales más estables.
+ * Canal de actualizaciones de la app. Beta incluye también las estables: siempre se ofrece la más
+ * nueva de las dos. (Hasta la 0.3.x hubo un tercer canal, Nightly, que ahora es Beta.)
  */
 enum class UpdateChannel(val label: String, val description: String) {
     STABLE("Estable", "Solo versiones finales, ya probadas."),
-    BETA("Beta", "Versiones de prueba antes de ser estables. Pueden tener algún fallo."),
-    NIGHTLY("Nightly", "Cada cambio nuevo en cuanto se hace. Para probar lo último; puede fallar.");
+    BETA("Beta", "Cada cambio nuevo en cuanto se hace, antes de ser estable. Para probar lo último; puede fallar.");
 
     /** ¿Acepta este canal una publicación del canal [other]? */
     fun accepts(other: UpdateChannel): Boolean = other.ordinal <= ordinal
+
+    companion object {
+        /** Lee el canal guardado. "NIGHTLY" (versiones anteriores) pasa a Beta. */
+        fun fromSaved(name: String?): UpdateChannel = when (name) {
+            "NIGHTLY" -> BETA
+            else -> entries.firstOrNull { it.name == name } ?: STABLE
+        }
+
+        /** Canal escrito en update.json ("stable", "beta"; "nightly" antiguo cuenta como beta). */
+        fun fromManifest(value: String?): UpdateChannel = if (value == "stable") STABLE else BETA
+    }
 }
 
 /** Publicación de GitHub Releases, con lo que necesita el actualizador. */
@@ -27,18 +37,14 @@ data class Release(
     /** Nombre del fichero adjunto → URL de descarga directa. */
     val assets: Map<String, String>,
 ) {
-    /** `nightly` → Nightly; pre-release → Beta; el resto → Estable. */
+    /** Pre-release (la beta continua, o la antigua `nightly`) → Beta; el resto → Estable. */
     val channel: UpdateChannel
-        get() = when {
-            tag == NIGHTLY_TAG -> UpdateChannel.NIGHTLY
-            prerelease -> UpdateChannel.BETA
-            else -> UpdateChannel.STABLE
-        }
+        get() = if (prerelease) UpdateChannel.BETA else UpdateChannel.STABLE
 
     val manifestUrl: String? get() = assets[MANIFEST_NAME]
 
     companion object {
-        const val NIGHTLY_TAG = "nightly"
+        const val BETA_TAG = "beta"
         const val MANIFEST_NAME = "update.json"
     }
 }
@@ -51,7 +57,20 @@ data class UpdateInfo(
     val sha256: String,
     val channel: UpdateChannel,
     val notes: String,
-)
+    /** Aviso opcional que se muestra junto a la actualización (p. ej. "corrige un fallo grave"). */
+    val notice: String? = null,
+    /** Las versiones por debajo de esta tienen un fallo de seguridad: se avisa con más insistencia. */
+    val minSafeVersionCode: Long = 0,
+) {
+    fun isUrgentFor(installed: Long): Boolean = installed < minSafeVersionCode
+}
+
+/** Dónde están los update.json de cada canal (ficheros estáticos: no cuentan contra la API de GitHub). */
+object UpdateUrls {
+    fun stableManifest(base: String, repo: String) = "$base/$repo/releases/latest/download/${Release.MANIFEST_NAME}"
+    fun betaManifest(base: String, repo: String) = "$base/$repo/releases/download/${Release.BETA_TAG}/${Release.MANIFEST_NAME}"
+    fun asset(base: String, repo: String, tag: String, name: String) = "$base/$repo/releases/download/$tag/$name"
+}
 
 object UpdateParser {
 
@@ -102,6 +121,7 @@ object UpdateParser {
         releases.filter { !it.draft && it.manifestUrl != null && channel.accepts(it.channel) }
             .maxByOrNull { it.publishedAt }
 
+    /** update.json leído a través de la API (respaldo): el APK tiene que estar en esa publicación. */
     fun parseManifest(json: String, release: Release): UpdateInfo {
         val o = JSONObject(json)
         return UpdateInfo(
@@ -110,7 +130,39 @@ object UpdateParser {
             apkUrl = release.assets[o.getString("apk")] ?: error("Falta el APK ${o.getString("apk")}"),
             sha256 = o.getString("sha256").lowercase(),
             channel = release.channel,
-            notes = release.notes,
+            notes = o.optString("notes").takeIf { it.isNotBlank() }?.let(::plainText) ?: release.notes,
+            notice = notice(o),
+            minSafeVersionCode = o.optLong("minSafeVersionCode", 0),
         )
     }
+
+    private val SAFE_NAME = Regex("""^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$""")
+
+    /**
+     * update.json estático (lo normal). El APK se busca en la publicación que dice `tag`, con un nombre
+     * sin barras ni "..": un manifiesto manipulado no puede apuntar a otro sitio.
+     */
+    fun parseStaticManifest(json: String, base: String, repo: String): UpdateInfo {
+        val o = JSONObject(json)
+        val tag = o.getString("tag")
+        val apk = o.getString("apk")
+        check(SAFE_NAME.matches(tag) && ".." !in tag) { "Etiqueta no válida: $tag" }
+        check(SAFE_NAME.matches(apk) && ".." !in apk && apk.endsWith(".apk")) { "Nombre de APK no válido: $apk" }
+        return UpdateInfo(
+            versionCode = o.getLong("versionCode"),
+            versionName = o.getString("versionName"),
+            apkUrl = UpdateUrls.asset(base, repo, tag, apk),
+            sha256 = o.getString("sha256").lowercase(),
+            channel = UpdateChannel.fromManifest(o.optString("channel")),
+            notes = plainText(o.optString("notes")),
+            notice = notice(o),
+            minSafeVersionCode = o.optLong("minSafeVersionCode", 0),
+        )
+    }
+
+    private fun notice(o: JSONObject): String? =
+        o.optString("notice").takeIf { it.isNotBlank() && it != "null" }?.take(500)
+
+    /** De las candidatas que se pudieron leer, la de versión más alta (null si ninguna). */
+    fun newest(candidates: List<UpdateInfo>): UpdateInfo? = candidates.maxByOrNull { it.versionCode }
 }

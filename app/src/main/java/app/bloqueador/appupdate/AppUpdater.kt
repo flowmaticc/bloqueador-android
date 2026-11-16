@@ -28,9 +28,10 @@ sealed interface UpdateCheck {
 /**
  * Actualizaciones de la propia app desde GitHub Releases (la app no está en Google Play).
  *
- * 1. Lista las publicaciones del repositorio y elige la más reciente del canal elegido.
- * 2. Lee su `update.json` (versión, nombre del APK y huella SHA-256).
- * 3. Si es más nueva que la instalada, descarga el APK, comprueba la huella e instala con
+ * 1. Lee el `update.json` del canal (fichero estático de la publicación: versión, APK, huella SHA-256,
+ *    notas y avisos). Beta lee también el de la estable y se queda con la versión más alta.
+ *    Si no se puede leer, lo busca a través de la API de GitHub (respaldo).
+ * 2. Si es más nueva que la instalada, descarga el APK, comprueba la huella e instala con
  *    `PackageInstaller`. Android solo acepta la actualización si va firmada con la misma clave.
  */
 class AppUpdater(private val context: Context, private val repo: String = BuildConfig.UPDATE_REPO) {
@@ -45,9 +46,7 @@ class AppUpdater(private val context: Context, private val repo: String = BuildC
 
     suspend fun check(channel: UpdateChannel): UpdateCheck = withContext(Dispatchers.IO) {
         try {
-            val releases = UpdateParser.parseReleases(get("${BuildConfig.UPDATE_API_BASE}/repos/$repo/releases?per_page=30"))
-            val release = UpdateParser.pick(releases, channel) ?: return@withContext UpdateCheck.UpToDate
-            val info = UpdateParser.parseManifest(get(requireTrusted(release.manifestUrl!!)), release)
+            val info = fromStaticFiles(channel) ?: fromApi(channel) ?: return@withContext UpdateCheck.UpToDate
             if (info.versionCode > installedVersionCode) UpdateCheck.Available(info) else UpdateCheck.UpToDate
         } catch (e: HttpStatus) {
             UpdateCheck.Failed(
@@ -60,6 +59,43 @@ class AppUpdater(private val context: Context, private val repo: String = BuildC
             Log.w(TAG, "Fallo al buscar actualizaciones", e)
             UpdateCheck.Failed("No se pudo comprobar: ${e.message ?: "sin conexión"}")
         }
+    }
+
+    /**
+     * Lo normal: los update.json estáticos del canal. null si no se pudo leer ninguno (se probará la
+     * API). Un canal sin publicación todavía (404) cuenta como "no hay nada", no como fallo.
+     */
+    private fun fromStaticFiles(channel: UpdateChannel): UpdateInfo? {
+        val base = BuildConfig.UPDATE_DOWNLOAD_BASE
+        val urls = buildList {
+            add(UpdateUrls.stableManifest(base, repo))
+            if (channel == UpdateChannel.BETA) add(UpdateUrls.betaManifest(base, repo))
+        }
+        var failed = false
+        val found = urls.mapNotNull { url ->
+            try {
+                UpdateParser.parseStaticManifest(get(requireTrusted(url)), base, repo)
+            } catch (e: HttpStatus) {
+                if (e.code != 404) failed = true // 404: ese canal aún no tiene publicación
+                null
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                // Sin red, o un update.json del formato anterior (sin "tag"): se prueba con la API.
+                Log.d(TAG, "update.json no disponible ($url): ${e.message}")
+                failed = true
+                null
+            }
+        }
+        if (failed) return null
+        return UpdateParser.newest(found.filter { channel.accepts(it.channel) })
+            ?: UpdateInfo(0, "", "", "", channel, "") // nada publicado en el canal: "al día"
+    }
+
+    /** Respaldo: la API de GitHub (tiene límite de peticiones por IP, por eso no es lo primero). */
+    private fun fromApi(channel: UpdateChannel): UpdateInfo? {
+        val releases = UpdateParser.parseReleases(get("${BuildConfig.UPDATE_API_BASE}/repos/$repo/releases?per_page=30"))
+        val release = UpdateParser.pick(releases, channel) ?: return null
+        return UpdateParser.parseManifest(get(requireTrusted(release.manifestUrl!!)), release)
     }
 
     /** Descarga el APK y verifica su huella. [progress] recibe 0..1. */
@@ -194,7 +230,7 @@ class AppUpdater(private val context: Context, private val repo: String = BuildC
 
     /** En la versión publicada solo se descarga por HTTPS y de GitHub. */
     private fun requireTrusted(url: String): String {
-        if (BuildConfig.DEBUG && BuildConfig.UPDATE_API_BASE.startsWith("http://127.0.0.1")) return url
+        if (BuildConfig.DEBUG && url.startsWith("http://127.0.0.1")) return url
         if (!isTrustedUrl(url)) throw IOException("Dirección de descarga no permitida.")
         return url
     }

@@ -1,11 +1,17 @@
-# Compila, prueba y publica la app en GitHub Releases según el canal:
+# Compila, prueba y publica la app en GitHub Releases. Dos canales:
 #
-#   Estable  → etiqueta vX.Y.Z            (publicación normal)
-#   Beta     → etiqueta vX.Y.Z-beta.N     (o -rc.N; marcada como pre-release)
-#   Nightly  → cada cambio en main        (pre-release "nightly", se sustituye en cada cambio)
+#   Beta    → cada cambio en main, SOLO si la variable del repositorio PUBLICAR_BETA es "true"
+#             (interruptor: mientras se trabaja a diario se deja apagado para no llenar de versiones).
+#             Es una única pre-release "beta" que se sustituye en cada publicación.
+#   Estable → solo a mano (Actions → Publicar → Run workflow → canal "estable"), y la firma pide la
+#             aprobación del entorno "estable" (Settings → Environments → Required reviewers).
 #
-# La app busca actualizaciones en estas publicaciones (ver app/.../appupdate). Cada una lleva el APK
-# firmado y un update.json con versionCode, versionName y huella SHA-256.
+# La app lee el update.json de cada canal como fichero estático:
+#   estable: releases/latest/download/update.json      beta: releases/download/beta/update.json
+#
+# Seguridad: el job que compila y firma no puede escribir en el repositorio; el que publica puede
+# escribir pero no ve la clave de firma. Antes de publicar se comprueba que el APK lleva firma v2+v3
+# con el certificado esperado (variable CERT_SHA256).
 #
 # El versionCode es 2000 + número de ejecución de este flujo: siempre crece, en cualquier canal.
 
@@ -14,22 +20,42 @@ name: Publicar
 on:
   push:
     branches: [main]
-    tags: ["v*"]
-    paths-ignore: ["docs/**", "**.md", "LICENSE"]
+    paths-ignore: ["docs/**", "**.md", "LICENSE", "reportes/**"]
   workflow_dispatch:
+    inputs:
+      canal:
+        description: "Canal"
+        type: choice
+        options: [beta, estable]
+        default: beta
+      aviso:
+        description: "Aviso opcional que verá el usuario junto a la actualización"
+        type: string
+        default: ""
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: publicar-${{ github.event_name == 'workflow_dispatch' && inputs.canal || 'beta' }}
   cancel-in-progress: false
 
 jobs:
-  publicar:
+  compilar:
+    # En un push, solo con el interruptor encendido.
+    if: github.event_name == 'workflow_dispatch' || vars.PUBLICAR_BETA == 'true'
     runs-on: ubuntu-latest
+    environment: ${{ (github.event_name == 'workflow_dispatch' && inputs.canal == 'estable') && 'estable' || 'beta' }}
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      name: ${{ steps.version.outputs.name }}
+      channel: ${{ steps.version.outputs.channel }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
@@ -42,21 +68,22 @@ jobs:
         id: version
         env:
           GH_TOKEN: ${{ github.token }}
+          CANAL: ${{ github.event_name == 'workflow_dispatch' && inputs.canal || 'beta' }}
         run: |
           base=$(grep '^appVersionName=' gradle.properties | cut -d= -f2)
           code=$((2000 + ${{ github.run_number }}))
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            tag="${GITHUB_REF#refs/tags/}"
-            name="${tag#v}"
-            if [[ "$name" == *-beta* || "$name" == *-rc* ]]; then channel=beta; else channel=stable; fi
-            # Si esta versión ya está publicada, no se vuelve a compilar ni publicar.
+          if [ "$CANAL" = "estable" ]; then
+            channel=stable
+            tag="v$base"
+            name="$base"
             if gh release view "$tag" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-              echo "skip=true" >> "$GITHUB_OUTPUT"
-              echo "La versión $tag ya está publicada: no se hace nada."
+              echo "::error::La versión $tag ya está publicada. Sube appVersionName en gradle.properties."
+              exit 1
             fi
           else
-            tag=nightly
-            # La nightly lleva el número de la versión siguiente a la última estable publicada: si
+            channel=beta
+            tag=beta
+            # La beta lleva el número de la versión siguiente a la última estable publicada: si
             # gradle.properties no va por delante, se usa la siguiente corrección (0.3.2 → 0.3.3).
             last=$(gh release list -R "$GITHUB_REPOSITORY" --exclude-pre-releases --limit 1 --json tagName -q '.[0].tagName' 2>/dev/null)
             last="${last#v}"
@@ -64,8 +91,7 @@ jobs:
               IFS=. read -r ma mi pa <<< "$last"
               base="$ma.$mi.$((pa + 1))"
             fi
-            name="${base}-nightly.$(date -u +%Y%m%d).${GITHUB_SHA::7}"
-            channel=nightly
+            name="${base}-beta.$(date -u +%Y%m%d).${GITHUB_SHA::7}"
           fi
           {
             echo "tag=$tag"
@@ -73,23 +99,22 @@ jobs:
             echo "code=$code"
             echo "channel=$channel"
             echo "apk=bloqueador-$name.apk"
+            echo "base=${tag#v}"
           } >> "$GITHUB_OUTPUT"
           echo "Versión $name ($code) · canal $channel"
 
       - name: Preparar la clave de firma
-        if: steps.version.outputs.skip != 'true'
         env:
           KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
         run: |
           if [ -z "$KEYSTORE_B64" ]; then
-            echo "::error::Faltan los secretos de firma del repositorio (RELEASE_KEYSTORE_BASE64…)"
+            echo "::error::Faltan los secretos de firma en el entorno (RELEASE_KEYSTORE_BASE64…)"
             exit 1
           fi
           echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
           echo "RELEASE_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
 
       - name: Tests y compilación firmada
-        if: steps.version.outputs.skip != 'true'
         env:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
@@ -99,6 +124,7 @@ jobs:
           ./gradlew --no-daemon :app:testReleaseUnitTest :app:assembleRelease \
             -PversionCode=${{ steps.version.outputs.code }} \
             -PversionName=${{ steps.version.outputs.name }} 2>&1 | tee build.log
+          rm -f "$RUNNER_TEMP/release.jks"
 
       - name: Errores de compilación y tests
         if: failure()
@@ -112,98 +138,123 @@ jobs:
             grep -o '<failure message="[^"]*"' "$f" | head -3 | while read -r l; do echo "::error::$(basename "$f"): $l"; done
           done
 
-      - name: Comprobar que el APK es la versión normal
-        if: steps.version.outputs.skip != 'true'
+      - name: Comprobar el APK (versión normal, firma v2+v3, certificado esperado)
+        env:
+          CERT_SHA256: ${{ vars.CERT_SHA256 }}
         run: |
-          # Solo se publica la app normal: sin el registro de depuración ni herramientas de pruebas.
           apk=app/build/outputs/apk/release/app-release.apk
           if unzip -p "$apk" 'classes*.dex' | grep -a -q -E 'QueryLog|consultas-|app/bloqueador/loadtest'; then
             echo "::error::El APK contiene código de depuración o de pruebas: no se publica."
             exit 1
           fi
-          aapt=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | tail -1)
-          "$aapt" dump badging "$apk" | grep -q "^package: name='app.bloqueador'" || { echo "::error::Paquete inesperado"; exit 1; }
-          if "$aapt" dump badging "$apk" | grep -q "application-debuggable"; then
+          bt=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$bt/aapt2" dump badging "$apk" | grep -q "^package: name='app.bloqueador'" || { echo "::error::Paquete inesperado"; exit 1; }
+          if "$bt/aapt2" dump badging "$apk" | grep -q "application-debuggable"; then
             echo "::error::El APK es de depuración: no se publica."; exit 1
           fi
-          echo "APK normal comprobado."
+          out=$("$bt/apksigner" verify -v --print-certs "$apk")
+          echo "$out" | grep -q "Verified using v2 scheme (APK Signature Scheme v2): true" || { echo "::error::Sin firma v2"; exit 1; }
+          echo "$out" | grep -q "Verified using v3 scheme (APK Signature Scheme v3): true" || { echo "::error::Sin firma v3"; exit 1; }
+          got=$(echo "$out" | grep -m1 "Signer #1 certificate SHA-256 digest" | awk '{print $NF}')
+          if [ -z "$CERT_SHA256" ]; then
+            echo "::error::Falta la variable del repositorio CERT_SHA256 (huella del certificado de firma)."; exit 1
+          fi
+          if [ "$got" != "$(echo "$CERT_SHA256" | tr 'A-F' 'a-f' | tr -d ': ')" ]; then
+            echo "::error::El APK está firmado con otro certificado ($got). No se publica."; exit 1
+          fi
+          echo "APK comprobado: v2+v3, certificado $got"
 
       - name: Preparar ficheros de la publicación
-        if: steps.version.outputs.skip != 'true'
+        env:
+          AVISO: ${{ github.event_name == 'workflow_dispatch' && inputs.aviso || '' }}
+          MIN_SAFE: ${{ vars.MIN_SAFE_VERSION_CODE || '0' }}
         run: |
           mkdir -p out
-          cp app/build/outputs/apk/release/app-release.apk "out/${{ steps.version.outputs.apk }}"
-          sha=$(sha256sum "out/${{ steps.version.outputs.apk }}" | cut -d' ' -f1)
-          cat > out/update.json <<EOF
-          {
-            "versionCode": ${{ steps.version.outputs.code }},
-            "versionName": "${{ steps.version.outputs.name }}",
-            "channel": "${{ steps.version.outputs.channel }}",
-            "apk": "${{ steps.version.outputs.apk }}",
-            "sha256": "$sha"
-          }
-          EOF
+          apk="${{ steps.version.outputs.apk }}"
+          cp app/build/outputs/apk/release/app-release.apk "out/$apk"
+          sha=$(sha256sum "out/$apk" | cut -d' ' -f1)
+          # Notas: la sección de la versión en NOVEDADES.md ("## 0.4.0") o, si no hay, "## Próxima versión".
+          section() { awk -v h="## $1" '$0==h{f=1;next} /^## /{f=0} f' NOVEDADES.md; }
+          notes="$(section "${{ steps.version.outputs.base }}")"
+          [ -n "$notes" ] || notes="$(section "Próxima versión")"
+          if [ "${{ steps.version.outputs.channel }}" = "stable" ] && [ -z "$(section "${{ steps.version.outputs.base }}")" ]; then
+            echo "::error::Falta la sección '## ${{ steps.version.outputs.base }}' en NOVEDADES.md"; exit 1
+          fi
+          printf '%s' "$notes" > out/notas.md
+          jq -n \
+            --argjson versionCode "${{ steps.version.outputs.code }}" \
+            --arg versionName "${{ steps.version.outputs.name }}" \
+            --arg channel "${{ steps.version.outputs.channel }}" \
+            --arg tag "${{ steps.version.outputs.tag }}" \
+            --arg apk "$apk" \
+            --arg sha256 "$sha" \
+            --arg notes "$notes" \
+            --arg notice "$AVISO" \
+            --argjson minSafeVersionCode "$MIN_SAFE" \
+            '{versionCode:$versionCode, versionName:$versionName, channel:$channel, tag:$tag, apk:$apk,
+              sha256:$sha256, notes:$notes, minSafeVersionCode:$minSafeVersionCode}
+             + (if $notice == "" then {} else {notice:$notice} end)' > out/update.json
           cat out/update.json
 
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: publicacion
+          path: out/
+          retention-days: 7
+
+  publicar:
+    needs: compilar
+    runs-on: ubuntu-latest
+    # Escribe en el repositorio, pero no tiene ningún secreto de firma.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: publicacion
+          path: out
+
       - name: Publicar en GitHub Releases
-        if: steps.version.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.compilar.outputs.tag }}
+          NAME: ${{ needs.compilar.outputs.name }}
+          CHANNEL: ${{ needs.compilar.outputs.channel }}
         run: |
-          tag="${{ steps.version.outputs.tag }}"
-          # Las notas salen de NOVEDADES.md: la sección de la versión ("## 0.3.0") o, para nightly y
-          # beta sin sección propia, "## Próxima versión".
-          section() { awk -v h="## $1" '$0==h{f=1;next} /^## /{f=0} f' NOVEDADES.md; }
-          base="${tag#v}"; base="${base%%-*}"
-          notes="$(section "$base")"
-          [ -n "$notes" ] || notes="$(section "Próxima versión")"
-          case "${{ steps.version.outputs.channel }}" in
-            nightly)
-              gh release delete nightly --cleanup-tag --yes || true
-              gh release create nightly out/* --prerelease --target "$GITHUB_SHA" \
-                --title "Nightly ${{ steps.version.outputs.name }}" \
-                --notes "$(printf 'Versión de desarrollo, con lo que llegará en la próxima versión:\n%s' "$notes")"
-              ;;
-            beta)
-              gh release create "$tag" out/* --prerelease --title "Garbillo $tag (beta)" --notes "$notes"
-              ;;
-            stable)
-              if [ -z "$(section "$base")" ]; then
-                echo "::error::Falta la sección '## $base' en NOVEDADES.md"; exit 1
-              fi
-              gh release create "$tag" out/* --title "Garbillo $tag" --notes "$notes"
-              ;;
-          esac
+          notes_file=out/notas.md
+          files=$(ls out/* | grep -v notas.md)
+          if [ "$CHANNEL" = "beta" ]; then
+            # Una sola beta: se sustituye. La antigua "nightly" (hasta la 0.3.x) se retira.
+            gh release delete nightly --cleanup-tag --yes 2>/dev/null || true
+            gh release delete beta --cleanup-tag --yes 2>/dev/null || true
+            { printf 'Versión de prueba con lo que llegará en la próxima versión estable.\n\n'; cat "$notes_file"; } > beta.md
+            gh release create beta $files --prerelease --target "$GITHUB_SHA" \
+              --title "Beta $NAME" --notes-file beta.md
+          else
+            gh release create "$TAG" $files --target "$GITHUB_SHA" --latest \
+              --title "Garbillo $TAG" --notes-file "$notes_file"
+          fi
 
       - name: Retirar los archivos de versiones antiguas
-        if: always()
+        if: needs.compilar.outputs.channel == 'stable'
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           # Las publicaciones se quedan como historial con sus notas, pero solo las dos estables más
-          # recientes conservan el APK (la actual y una anterior por si hay que volver atrás). Las betas
-          # anteriores a la última estable también lo pierden. Sin update.json, la app ya no las ofrece.
+          # recientes conservan el APK (la actual y una anterior por si hay que volver atrás).
           marker="Los archivos de esta versión se han retirado"
-          gh api "repos/$GITHUB_REPOSITORY/releases" --paginate \
-            -q '.[] | select(.tag_name != "nightly" and .draft == false) | [.tag_name, .prerelease, .created_at, (.assets | length)] | @tsv' \
-            | sort -t$'\t' -k3 -r > releases.tsv
-          stables=0; latest_stable=""
-          while IFS=$'\t' read -r tag pre created assets; do
-            if [ "$pre" = "false" ]; then
-              stables=$((stables + 1))
-              [ -z "$latest_stable" ] && latest_stable="$created"
-              [ "$stables" -le 2 ] && continue
-            else
-              # Beta: se conserva si es posterior a la última estable.
-              if [ -z "$latest_stable" ] || [[ "$created" > "$latest_stable" ]]; then continue; fi
-            fi
-            [ "$assets" -eq 0 ] && continue
-            echo "Retirando los archivos de $tag"
-            gh release view "$tag" -R "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' | while read -r name; do
-              gh release delete-asset "$tag" "$name" -R "$GITHUB_REPOSITORY" --yes
+          gh api "repos/$GH_REPO/releases" --paginate \
+            -q '.[] | select(.prerelease == false and .draft == false) | [.tag_name, .created_at, (.assets | length)] | @tsv' \
+            | sort -t$'\t' -k2 -r | tail -n +3 | while IFS=$'\t' read -r tag created assets; do
+              [ "$assets" -eq 0 ] && continue
+              echo "Retirando los archivos de $tag"
+              gh release view "$tag" --json assets -q '.assets[].name' | while read -r name; do
+                gh release delete-asset "$tag" "$name" --yes
+              done
+              body=$(gh release view "$tag" --json body -q .body)
+              if ! grep -q "$marker" <<< "$body"; then
+                gh release edit "$tag" --notes "$(printf '%s\n\n---\n_%s para que no se instalen versiones antiguas. Descarga la versión estable más reciente._' "$body" "$marker")"
+              fi
             done
-            body=$(gh release view "$tag" -R "$GITHUB_REPOSITORY" --json body -q .body)
-            if ! grep -q "$marker" <<< "$body"; then
-              gh release edit "$tag" -R "$GITHUB_REPOSITORY" --notes "$(printf '%s\n\n---\n_%s para que no se instalen versiones antiguas. Descarga la versión estable más reciente._' "$body" "$marker")"
-            fi
-          done < releases.tsv

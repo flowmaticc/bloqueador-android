@@ -35,7 +35,8 @@ class AppUpdateWorker(context: Context, params: WorkerParameters) : CoroutineWor
         val result = AppUpdater(applicationContext).check(settings.updateChannel)
         settings.lastAppUpdateCheck = System.currentTimeMillis()
         if (result is UpdateCheck.Available && result.info.versionCode != settings.notifiedVersionCode) {
-            notify(applicationContext, result.info)
+            val urgent = result.info.isUrgentFor(AppUpdater(applicationContext).installedVersionCode)
+            notify(applicationContext, result.info, urgent)
             settings.notifiedVersionCode = result.info.versionCode
         }
         return Result.success()
@@ -44,6 +45,7 @@ class AppUpdateWorker(context: Context, params: WorkerParameters) : CoroutineWor
     companion object {
         private const val WORK_NAME = "app-update"
         private const val CHANNEL_ID = "app_updates"
+        private const val URGENT_CHANNEL_ID = "app_updates_security"
         private const val NOTIFICATION_ID = 3
         const val EXTRA_OPEN_UPDATES = "open_updates"
 
@@ -62,19 +64,33 @@ class AppUpdateWorker(context: Context, params: WorkerParameters) : CoroutineWor
                 .enqueueUniquePeriodicWork(WORK_NAME, ExistingPeriodicWorkPolicy.UPDATE, request)
         }
 
-        private fun notify(context: Context, info: UpdateInfo) {
+        private fun notify(context: Context, info: UpdateInfo, urgent: Boolean) {
             if (Build.VERSION.SDK_INT >= 33 &&
                 ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
                 PackageManager.PERMISSION_GRANTED
             ) return
-            context.getSystemService(NotificationManager::class.java).createNotificationChannel(
+            val nm = context.getSystemService(NotificationManager::class.java)
+            nm.createNotificationChannel(
                 NotificationChannel(CHANNEL_ID, "Actualizaciones de la app", NotificationManager.IMPORTANCE_LOW)
             )
+            // Las de seguridad van por un canal que sí suena (el usuario puede silenciarlo aparte).
+            nm.createNotificationChannel(
+                NotificationChannel(URGENT_CHANNEL_ID, "Actualizaciones de seguridad", NotificationManager.IMPORTANCE_DEFAULT)
+            )
             val open = Intent(context, MainActivity::class.java).putExtra(EXTRA_OPEN_UPDATES, true)
-            val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            val text = when {
+                urgent -> "Corrige un fallo de seguridad de tu versión. Toca para instalarla."
+                info.notice != null -> info.notice
+                else -> "Toca para ver los cambios e instalarla."
+            }
+            val notification = NotificationCompat.Builder(context, if (urgent) URGENT_CHANNEL_ID else CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_stat_garbillo)
-                .setContentTitle("Nueva versión de Garbillo: ${info.versionName}")
-                .setContentText("Toca para ver los cambios e instalarla.")
+                .setContentTitle(
+                    if (urgent) "Actualización importante de Garbillo: ${info.versionName}"
+                    else "Nueva versión de Garbillo: ${info.versionName}"
+                )
+                .setContentText(text)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
                 .setAutoCancel(true)
                 .setContentIntent(
                     PendingIntent.getActivity(
