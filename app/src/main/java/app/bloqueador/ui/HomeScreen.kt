@@ -52,6 +52,7 @@ import app.bloqueador.BloqueadorApp
 import app.bloqueador.VpnState
 import app.bloqueador.update.UpdateNotifier
 import app.bloqueador.vpn.DnsVpnService
+import app.bloqueador.vpn.LockdownWarning
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -87,6 +88,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
     var confirmMobileData by remember { mutableStateOf(false) }
     // Se vuelve a leer al volver de los ajustes de Android (el usuario puede haberlo cambiado).
     var privateDns by remember { mutableStateOf(privateDnsMode(context)) }
+    var lockdown by remember { mutableStateOf(app.settings.vpnLockdown) }
     // Solo mientras la pantalla está a la vista: en segundo plano no se despierta la CPU para nada.
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(lifecycle) {
@@ -99,6 +101,8 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
                 dnsSilent = app.dnsUnresponsive?.invoke() == true
                 waitingForWifi = !DownloadPolicy.automaticAllowed(context)
                 privateDns = privateDnsMode(context)
+                app.checkLockdown?.invoke()
+                lockdown = app.settings.vpnLockdown
                 lastUpdated = app.repository.lastUpdated // la descarga inicial la hace el servicio
                 delay(1000)
             }
@@ -141,6 +145,21 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
                         if (on) startVpn() else DnsVpnService.stop(context)
                     },
                 )
+            }
+        }
+
+        if (lockdown && running) {
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("El móvil no tiene internet", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Android tiene activado \"Bloquear conexiones sin VPN\". Garbillo solo filtra el DNS y " +
+                            "no lleva el resto del tráfico, así que con esa opción Android corta todo internet. " +
+                            "Toca el engranaje junto a Garbillo y desactívala; puedes dejar \"VPN siempre activa\".",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    OutlinedButton(onClick = { LockdownWarning.openVpnSettings(context) }) { Text("Abrir ajustes de VPN") }
+                }
             }
         }
 

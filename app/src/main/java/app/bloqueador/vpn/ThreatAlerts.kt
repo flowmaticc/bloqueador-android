@@ -51,6 +51,15 @@ class ThreatAlerts(private val context: Context) {
             )
             .setAutoCancel(true)
             .setContentIntent(PendingIntent.getActivity(context, 7, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
+            // En la pantalla de bloqueo, sin dominio ni app: quien tenga el móvil delante no ve qué se visitaba.
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(
+                NotificationCompat.Builder(context, CHANNEL_ID)
+                    .setSmallIcon(R.drawable.ic_stat_garbillo)
+                    .setContentTitle("Sitio peligroso bloqueado")
+                    .setContentText("Desbloquea el móvil para ver los detalles.")
+                    .build()
+            )
             .build()
         runCatching { nm.notify(NOTIFICATION_ID, notification) } // sin permiso de notificaciones: no pasa nada
     }

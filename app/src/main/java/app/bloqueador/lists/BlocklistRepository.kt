@@ -7,11 +7,14 @@ import app.bloqueador.filter.FilterEngine
 import app.bloqueador.settings.AppSettings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.ConcurrentHashMap
 
 /** Resultado de comprobar todas las listas: si alguna cambió y los errores de las que fallaron. */
 data class UpdateResult(val changed: Boolean, val errors: List<String>) {
@@ -113,6 +116,12 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
     private val dir = File(context.filesDir, "lists").apply { mkdirs() }
     private val prefs = context.getSharedPreferences("lists", Context.MODE_PRIVATE)
 
+    /**
+     * Un cerrojo por lista: la descarga periódica, la del servicio al arrancar y la que pide el usuario
+     * pueden coincidir, y dos descargas de la misma lista se pisarían el fichero y el ETag.
+     */
+    private val locks = ConcurrentHashMap<String, Mutex>()
+
     /** Listas activas ahora mismo: la base del modo, las capas marcadas y la de amenazas. */
     fun activeSources(): List<ListSource> = adSources() + listOfNotNull(threatSource())
 
@@ -181,6 +190,9 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
             ThreatLevel.entries.map { it.source })
             .map { "${it.id}.txt" }.toSet()
         dir.listFiles()?.filter { it.isFile && it.name.endsWith(".txt") && it.name !in known }?.forEach { it.delete() }
+        // Temporales de descargas que no terminaron (la app se cerró a mitad).
+        val old = System.currentTimeMillis() - 60 * 60_000L
+        dir.listFiles()?.filter { it.isFile && it.name.endsWith(".tmp") && it.lastModified() < old }?.forEach { it.delete() }
     }
 
     /**
@@ -228,9 +240,12 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
      * temporal y lo valida antes de sustituir la lista vigente.
      * @return true si hay una lista nueva que recargar.
      */
-    private suspend fun download(source: ListSource): Boolean = withContext(Dispatchers.IO) {
+    private suspend fun download(source: ListSource): Boolean =
+        locks.getOrPut(source.id) { Mutex() }.withLock { downloadLocked(source) }
+
+    private suspend fun downloadLocked(source: ListSource): Boolean = withContext(Dispatchers.IO) {
         val target = fileFor(source)
-        val tmp = File(dir, "${target.name}.tmp")
+        val tmp = File.createTempFile("${source.id}.", ".tmp", dir) // nombre único por descarga
         val etagKey = "etag_${source.id}"
         val countKey = "count_${source.id}"
         val updatedKey = "updated_${source.id}"

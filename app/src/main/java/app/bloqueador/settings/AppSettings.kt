@@ -85,6 +85,11 @@ class AppSettings(context: Context) {
         get() = if (prefs.contains("always_on_vpn")) prefs.getBoolean("always_on_vpn", false) else null
         set(v) = prefs.edit().apply { if (v == null) remove("always_on_vpn") else putBoolean("always_on_vpn", v) }.apply()
 
+    /** Android tiene activado "Bloquear conexiones sin VPN" (con Garbillo deja el móvil sin internet). */
+    var vpnLockdown: Boolean
+        get() = prefs.getBoolean("vpn_lockdown", false)
+        set(v) = prefs.edit().putBoolean("vpn_lockdown", v).apply()
+
     /** Cada cuánto se comprueban las listas en segundo plano. */
     var updateFrequency: UpdateFrequency
         get() = UpdateFrequency.entries.firstOrNull { it.name == prefs.getString("update_frequency", null) }

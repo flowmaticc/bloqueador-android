@@ -1,5 +1,6 @@
 package app.bloqueador.vpn
 
+import app.bloqueador.intentar
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -172,7 +173,7 @@ class DnsVpnService : VpnService() {
         // caché varios minutos: esos anuncios seguirían cargando un rato.
         scope.launch {
             if (app.engine.matcher === DomainMatcher.EMPTY && app.repository.hasListsOnDisk()) {
-                runCatching { app.reloadEngine() }.onFailure { Log.w(TAG, "No se pudo cargar la lista", it) }
+                intentar { app.reloadEngine() }.onFailure { Log.w(TAG, "No se pudo cargar la lista", it) }
             }
             withContext(Dispatchers.Main) { if (gen == generation) openAndStart() }
         }
@@ -182,7 +183,11 @@ class DnsVpnService : VpnService() {
         starting = false
         if (forwarder == null || tunnel != null) return // se detuvo mientras cargaban las listas
         val opened = openTunnel()
-        if (Build.VERSION.SDK_INT >= 29) app.settings.alwaysOnVpn = isAlwaysOn
+        if (Build.VERSION.SDK_INT >= 29) {
+            app.settings.alwaysOnVpn = isAlwaysOn
+            LockdownWarning.update(this, isLockdownEnabled)
+            app.checkLockdown = { LockdownWarning.update(this, isLockdownEnabled) }
+        }
         if (opened == null) {
             // null = la app no tiene permiso VPN (p. ej. otra VPN lo tiene ahora).
             app.setVpnState(VpnState.Error("No se pudo activar la VPN. ¿Hay otra VPN activa?"))
@@ -379,6 +384,9 @@ class DnsVpnService : VpnService() {
         starting = false
         generation++
         app.dnsUnresponsive = null
+        app.checkLockdown = null
+        // Con el filtro apagado la opción no corta nada: el aviso ya no aplica.
+        LockdownWarning.update(this, false)
         tunnel?.let { closeTunnel(it) }
         tunnel = null
         forwarder?.stop()

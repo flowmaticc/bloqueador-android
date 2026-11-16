@@ -684,7 +684,8 @@ private fun BatterySection() {
         )
         Text(
             "En Ajustes de Android → Red → VPN, toca el engranaje junto a Garbillo y activa \"VPN siempre activa\". " +
-                "No actives \"Bloquear conexiones sin VPN\": si el filtro se reinicia, te quedarías sin internet unos segundos.",
+                "No actives \"Bloquear conexiones sin VPN\": Garbillo solo lleva el DNS, así que con esa opción " +
+                "Android corta todo internet en el móvil.",
             style = MaterialTheme.typography.bodySmall,
         )
         OutlinedButton(onClick = {
@@ -692,6 +693,20 @@ private fun BatterySection() {
                 context.startActivity(android.content.Intent(android.provider.Settings.ACTION_VPN_SETTINGS))
             }
         }) { Text("Abrir ajustes de VPN") }
+    }
+    // Perfil de trabajo, Espacio privado (Android 15) o "Carpeta segura": cada perfil tiene sus propias
+    // VPN, así que sus apps no pasan por Garbillo.
+    val otherProfiles = remember {
+        runCatching { context.getSystemService(android.os.UserManager::class.java).userProfiles.size - 1 }.getOrDefault(0)
+    }
+    if (otherProfiles > 0) {
+        SectionCard("Otros perfiles del móvil") {
+            Text(
+                "Este móvil tiene un perfil de trabajo, un Espacio privado o una carpeta segura. Android da a " +
+                    "cada perfil su propia VPN, así que Garbillo no filtra las apps de ese perfil, solo las de este.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
     }
     SectionCard("Consumo medido") {
         Text(

@@ -1,5 +1,6 @@
 package app.bloqueador.update
 
+import app.bloqueador.intentar
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -83,13 +84,15 @@ class ListUpdateWorker(context: Context, params: WorkerParameters) : CoroutineWo
         val app = applicationContext as BloqueadorApp
         // Aprovecha que el móvil ya está despierto: aunque el filtro lleve días apagado (sin
         // consultas nuevas que disparen la limpieza), el historial antiguo se borra a su tiempo.
-        runCatching { app.history.cleanup() }
+        intentar { app.history.cleanup() }
         val result = app.repository.downloadAll()
 
         if (result.changed && app.vpnState.value is VpnState.Running) {
             try {
                 app.reloadEngine()
                 Log.i(TAG, "Listas cambiadas: motor recargado (${app.engine.matcher.size} reglas)")
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 Log.w(TAG, "No se pudo recargar el motor", e)
             }

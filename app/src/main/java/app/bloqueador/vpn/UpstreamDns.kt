@@ -52,15 +52,21 @@ class UpstreamDns(context: Context) {
         runCatching { cm.unregisterNetworkCallback(callback) }
     }
 
-    /** Servidores a probar en orden: IPv4 primero (más fiable a través de cualquier red), luego IPv6, luego respaldo. */
+    /**
+     * Servidores a probar en orden: IPv4 primero (más fiable a través de cualquier red), luego IPv6.
+     * El respaldo (Quad9) solo si la red no anuncia ningún DNS: así los nombres internos de la red
+     * (router, impresoras, intranets) nunca salen a un tercero.
+     */
     fun current(): List<InetAddress> {
         val list = synchronized(servers) { servers[lastNetwork] ?: servers.values.lastOrNull() } ?: emptyList()
-        val sorted = list.sortedBy { if (it is Inet4Address) 0 else 1 }
-        return sorted + FALLBACK.filterNot { it in sorted }
+        return choose(list)
     }
 
 
     companion object {
+        internal fun choose(network: List<InetAddress>): List<InetAddress> =
+            if (network.isEmpty()) FALLBACK else network.sortedBy { if (it is Inet4Address) 0 else 1 }
+
         val FALLBACK: List<InetAddress> = listOf(
             InetAddress.getByAddress(byteArrayOf(9, 9, 9, 9)),
             InetAddress.getByAddress(byteArrayOf(149.toByte(), 112, 112, 112)),

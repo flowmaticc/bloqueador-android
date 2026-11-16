@@ -85,6 +85,8 @@ fun AppUpdateSection() {
                 "Instalando… Android te pedirá confirmación. Si Google Play Protect la bloquea o avisa de " +
                     "que la app es desconocida, pulsa \"Más detalles\" → \"Instalar de todas formas\": sale " +
                     "porque Garbillo no está en Google Play."
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 app.bloqueador.diag.ErrorReports.record(context, "actualizacion_app", e)
                 "No se pudo actualizar: ${e.message}"

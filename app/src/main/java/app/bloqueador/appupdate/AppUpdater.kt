@@ -51,9 +51,11 @@ class AppUpdater(private val context: Context, private val repo: String = BuildC
             if (info.versionCode > installedVersionCode) UpdateCheck.Available(info) else UpdateCheck.UpToDate
         } catch (e: HttpStatus) {
             UpdateCheck.Failed(
-                if (e.code == 404) "No se encuentra el repositorio de actualizaciones (¿sigue siendo privado?)."
+                if (e.code == 404) "No se encuentra la versión publicada en GitHub. Vuelve a probar más tarde."
                 else "GitHub respondió con el error ${e.code}."
             )
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.w(TAG, "Fallo al buscar actualizaciones", e)
             UpdateCheck.Failed("No se pudo comprobar: ${e.message ?: "sin conexión"}")
@@ -253,8 +255,9 @@ class InstallResultReceiver : BroadcastReceiver() {
                             "Desinstálala una vez e instala la de GitHub."
                     PackageInstaller.STATUS_FAILURE_STORAGE -> "No se pudo actualizar: falta espacio."
                     PackageInstaller.STATUS_FAILURE_BLOCKED ->
-                        "Google Play Protect bloqueó la actualización. Vuelve a intentarlo y, en su aviso, " +
-                            "pulsa \"Más detalles\" → \"Instalar de todas formas\"."
+                        "Android bloqueó la actualización. Si fue Google Play Protect, vuelve a intentarlo y, en " +
+                            "su aviso, pulsa \"Más detalles\" → \"Instalar de todas formas\". Si el móvil lo gestiona " +
+                            "una empresa o un colegio, puede que no permita instalar apps de fuera de Google Play."
                     else -> "No se pudo instalar la actualización."
                 }
                 InstallStatus.message.value = message

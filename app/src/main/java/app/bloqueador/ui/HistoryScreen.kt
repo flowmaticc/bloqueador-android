@@ -216,6 +216,27 @@ private fun HistoryDetailDialog(
     }
 
     var reporting by remember { mutableStateOf(false) }
+    var confirmThreat by remember { mutableStateOf(false) }
+    if (confirmThreat) {
+        AlertDialog(
+            onDismissRequest = { confirmThreat = false },
+            title = { Text("¿Permitir un sitio peligroso?") },
+            text = {
+                Text(
+                    "${event.domain} está en la lista de amenazas (phishing, malware o estafas). Si lo " +
+                        "permites, Garbillo dejará de protegerte frente a él en todas las apps. Hazlo solo " +
+                        "si estás seguro de que es un error de la lista; si no, mejor repórtalo."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmThreat = false
+                    apply("${event.domain} permitido") { settings.allowedDomains = settings.allowedDomains + event.domain }
+                }) { Text("Permitir de todas formas") }
+            },
+            dismissButton = { TextButton(onClick = { confirmThreat = false }) { Text("Cancelar") } },
+        )
+    }
     if (reporting) {
         ReportDialog(
             domain = event.domain,
@@ -281,6 +302,8 @@ private fun HistoryDetailDialog(
                     userBlock != null -> TextButton(onClick = {
                         apply("Bloqueo quitado") { settings.blockedDomains = settings.blockedDomains - userBlock }
                     }) { Text("Quitar mi bloqueo") }
+                    event.blocked && FilterEngine.isThreat(event.matchedRule) ->
+                        TextButton(onClick = { confirmThreat = true }) { Text("Permitir siempre…") }
                     event.blocked -> TextButton(onClick = {
                         apply("${event.domain} permitido") { settings.allowedDomains = settings.allowedDomains + event.domain }
                     }) { Text("Permitir siempre") }

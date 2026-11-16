@@ -1,5 +1,6 @@
 package app.bloqueador.ui
 
+import app.bloqueador.intentar
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -88,7 +89,7 @@ fun ReportDialog(domain: String, suggested: ReportReason, onDismiss: () -> Unit)
 }
 
 private suspend fun sendReport(domain: String, reason: ReportReason, note: String): Boolean = withContext(Dispatchers.IO) {
-    runCatching {
+    intentar {
         val conn = (URL(BuildConfig.REPORT_URL).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = 10_000
@@ -102,9 +103,11 @@ private suspend fun sendReport(domain: String, reason: ReportReason, note: Strin
             .put("origen", "app")
             .put("version", BuildConfig.VERSION_NAME)
             .put("nota", note.trim())
-        conn.outputStream.use { it.write(body.toString().toByteArray()) }
-        val ok = conn.responseCode == 200
-        conn.disconnect()
-        ok
+        try {
+            conn.outputStream.use { it.write(body.toString().toByteArray()) }
+            conn.responseCode == 200
+        } finally {
+            conn.disconnect() // también si falla a mitad (sin red, tiempo agotado)
+        }
     }.getOrDefault(false)
 }

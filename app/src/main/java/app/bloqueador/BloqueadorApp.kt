@@ -31,6 +31,10 @@ class BloqueadorApp : Application() {
     @Volatile
     var dnsUnresponsive: (() -> Boolean)? = null
 
+    /** Con el filtro activo: vuelve a comprobar "Bloquear conexiones sin VPN" (solo lo sabe el servicio). */
+    @Volatile
+    var checkLockdown: (() -> Unit)? = null
+
     fun setVpnState(state: VpnState) {
         _vpnState.value = state
     }

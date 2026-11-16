@@ -38,6 +38,8 @@ class ErrorReportWorker(context: Context, params: WorkerParameters) : CoroutineW
                 code == 413 || code == 400 -> { ErrorReports.clear(applicationContext); Result.success() } // no se aceptará nunca
                 else -> Result.retry()
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
             Log.d(TAG, "No se pudo enviar el informe: ${e.javaClass.simpleName}")
             Result.retry()
