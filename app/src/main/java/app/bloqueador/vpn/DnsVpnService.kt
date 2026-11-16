@@ -1,5 +1,6 @@
 package app.bloqueador.vpn
 
+import android.os.SystemClock
 import app.bloqueador.intentar
 import android.app.Notification
 import android.app.NotificationChannel
@@ -330,10 +331,26 @@ class DnsVpnService : VpnService() {
         }
     }
 
+    @Volatile
+    private var lockdownCheckedAt = 0L
+
+    /**
+     * Android no reinicia el servicio al activar o desactivar "Bloquear conexiones sin VPN", así que se
+     * vuelve a mirar cuando llegan consultas (alguien intenta usar internet), como mucho cada 30 s.
+     */
+    private fun checkLockdownNow() {
+        if (Build.VERSION.SDK_INT < 29) return
+        val now = SystemClock.elapsedRealtime()
+        if (now - lockdownCheckedAt < LOCKDOWN_CHECK_MS) return
+        lockdownCheckedAt = now
+        runCatching { LockdownWarning.update(this, isLockdownEnabled) }
+    }
+
     private fun handlePacket(buffer: ByteArray, length: Int) {
         val udp = IpPacket.parseUdp(buffer, length) ?: return
         if (udp.destinationPort != 53) return
         val question = DnsMessage.parseQuery(udp.data, udp.payloadOffset, udp.payloadLength) ?: return
+        checkLockdownNow()
 
         val rule = app.engine.decide(question.name)
         // Averiguar la app es una llamada al sistema: se hace como mucho una vez por consulta.
@@ -438,6 +455,7 @@ class DnsVpnService : VpnService() {
         private const val ACTION_STOP = "app.bloqueador.STOP"
         private const val ACTION_RELOAD = "app.bloqueador.RELOAD"
         private const val CHANNEL_ID = "vpn_status"
+        private const val LOCKDOWN_CHECK_MS = 30_000L
         private const val NOTIFICATION_ID = 1
 
         private const val TUN_V4 = "10.111.222.1"

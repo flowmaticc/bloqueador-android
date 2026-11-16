@@ -27,13 +27,23 @@ object LockdownWarning {
     private const val CHANNEL_ID = "filter_alerts" // el mismo canal que los demás avisos del filtro
     private const val NOTIFICATION_ID = 7
 
-    /** Guarda el estado y muestra o quita la notificación solo si ha cambiado. */
+    /**
+     * Guarda el estado y muestra o quita la notificación. Si la opción sigue activada pero la
+     * notificación ya no está (reinicio del móvil, el usuario la descartó), se vuelve a mostrar.
+     */
     fun update(context: Context, lockdown: Boolean) {
         val settings = (context.applicationContext as BloqueadorApp).settings
-        if (settings.vpnLockdown == lockdown) return
-        settings.vpnLockdown = lockdown
-        if (lockdown) notify(context) else NotificationManagerCompat.from(context).cancel(NOTIFICATION_ID)
+        val changed = settings.vpnLockdown != lockdown
+        if (changed) settings.vpnLockdown = lockdown
+        when {
+            !lockdown -> if (changed || isShowing(context)) NotificationManagerCompat.from(context).cancel(NOTIFICATION_ID)
+            changed || !isShowing(context) -> notify(context)
+        }
     }
+
+    private fun isShowing(context: Context): Boolean = runCatching {
+        context.getSystemService(NotificationManager::class.java).activeNotifications.any { it.id == NOTIFICATION_ID }
+    }.getOrDefault(false)
 
     fun openVpnSettings(context: Context) {
         runCatching {
@@ -58,6 +68,7 @@ object LockdownWarning {
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setOngoing(true) // se quita sola al desactivar la opción
+            .setOnlyAlertOnce(true)
             .setContentIntent(
                 PendingIntent.getActivity(
                     context, NOTIFICATION_ID, Intent(Settings.ACTION_VPN_SETTINGS), PendingIntent.FLAG_IMMUTABLE
