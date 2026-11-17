@@ -2,7 +2,23 @@
 
 ## Próxima versión
 
-- Sin cambios todavía respecto a la 0.3.3.
+- Sin cambios todavía respecto a la 0.4.0.
+
+## 0.4.0
+
+- **En inglés y en español**: la app usa el idioma del móvil y puedes cambiarlo en Ajustes → Idioma.
+- **DNS cifrado, opcional**: en Ajustes → DNS cifrado puedes enviar las consultas cifradas a Quad9,
+  Cloudflare o Mullvad, para que tu operador o la wifi no vean qué webs visitas. En una wifi con página
+  de acceso (hoteles, aeropuertos) se usa la de la red mientras inicias sesión.
+- **Aviso de "Bloquear conexiones sin VPN"**: si esa opción de Android está activada, el móvil se puede
+  quedar sin internet; ahora la app lo avisa, Inicio indica "Sin internet" y explica cómo quitarla.
+- Si el móvil tiene otro perfil (por ejemplo, de trabajo), se avisa de que el filtro no lo cubre.
+- **Más estable**: una app que hace demasiadas consultas ya no frena a las demás, la conexión se
+  recupera antes al pasar de wifi a datos y al revés, y cargar las listas usa menos memoria.
+- El canal Nightly pasa a llamarse **Beta**; si lo tenías elegido, cambia solo.
+- Las notas de cada versión salen en tu idioma, y si una versión corrige un fallo importante la app te
+  lo avisa con más insistencia.
+- Inicio muestra "Todas las apps" cuando no hay ninguna excluida.
 
 ## 0.3.3
 

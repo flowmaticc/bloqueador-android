@@ -5,7 +5,24 @@
 
 ## Next version
 
-- No changes yet since 0.3.3.
+- No changes yet since 0.4.0.
+
+## 0.4.0
+
+- **In English and Spanish**: the app uses your phone's language and you can change it in
+  Settings → Language.
+- **Optional encrypted DNS**: in Settings → Encrypted DNS you can send queries encrypted to Quad9,
+  Cloudflare or Mullvad, so your carrier or the Wi-Fi can't see which websites you visit. On a Wi-Fi
+  with a sign-in page (hotels, airports) the network's DNS is used while you sign in.
+- **"Block connections without VPN" notice**: if that Android option is on, the phone can be left
+  without internet; now the app warns you, Home shows "No internet" and explains how to turn it off.
+- If the phone has another profile (for example, a work profile), you're told the filter doesn't cover it.
+- **More stable**: an app making too many queries no longer slows down the others, the connection
+  recovers faster when switching between Wi-Fi and mobile data, and loading lists uses less memory.
+- The Nightly channel is now called **Beta**; if you had it selected, it changes on its own.
+- The notes for each version are shown in your language, and if a version fixes an important bug the
+  app tells you more insistently.
+- Home shows "All apps" when none are excluded.
 
 ## 0.3.3
 
