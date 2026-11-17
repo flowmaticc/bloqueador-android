@@ -12,7 +12,7 @@ REPO = "flowmaticc/garbillo-reportes"
 [[d1_databases]]
 binding = "DB"
 database_name = "garbillo-reportes"
-database_id = "PENDIENTE-wrangler-d1-create"
+database_id = "e8426714-a4eb-42f4-bfcf-439c3b050573"
 
 # Borra cada día los contadores caducados.
 [triggers]
