@@ -1,5 +1,8 @@
 package app.bloqueador.ui
 
+import androidx.compose.ui.res.stringResource
+import app.bloqueador.R
+import app.bloqueador.UiText
 import app.bloqueador.intentar
 import android.widget.Toast
 import androidx.compose.foundation.layout.Arrangement
@@ -28,11 +31,11 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /** Motivos de un reporte (los mismos que acepta el servicio de reportes). */
-enum class ReportReason(val id: String, val label: String) {
-    AD("anuncio", "Pasa publicidad o rastreo"),
-    BROKEN("rota", "Algo deja de funcionar"),
-    DANGER("peligro", "Parece peligroso (phishing, estafa…)"),
-    OTHER("otro", "Otro"),
+enum class ReportReason(val id: String, val label: UiText) {
+    AD("anuncio", UiText.res(R.string.reason_ad)),
+    BROKEN("rota", UiText.res(R.string.reason_broken)),
+    DANGER("peligro", UiText.res(R.string.reason_danger)),
+    OTHER("otro", UiText.res(R.string.reason_other)),
 }
 
 /**
@@ -49,24 +52,20 @@ fun ReportDialog(domain: String, suggested: ReportReason, onDismiss: () -> Unit)
 
     AlertDialog(
         onDismissRequest = { if (!sending) onDismiss() },
-        title = { Text("Reportar para analizar") },
+        title = { Text(stringResource(R.string.report_title)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(domain, style = MaterialTheme.typography.titleSmall)
                 ReportReason.entries.forEach { r ->
-                    RadioRow(selected = r == reason, title = r.label, description = "") { reason = r }
+                    RadioRow(selected = r == reason, title = r.label.get(), description = "") { reason = r }
                 }
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it.take(300) },
-                    label = { Text("Nota (opcional)") },
+                    label = { Text(stringResource(R.string.report_note)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Text(
-                    "Se envía solo este dominio, el motivo y la nota. Sirve para mejorar las listas de " +
-                        "todos. Nada de tu historial ni de tus apps.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
+                Text(stringResource(R.string.report_privacy), style = MaterialTheme.typography.bodySmall)
             }
         },
         confirmButton = {
@@ -76,15 +75,15 @@ fun ReportDialog(domain: String, suggested: ReportReason, onDismiss: () -> Unit)
                     val ok = sendReport(domain, reason, note)
                     Toast.makeText(
                         context,
-                        if (ok) "Gracias: se analizará $domain" else "No se pudo enviar. Prueba más tarde.",
+                        if (ok) context.getString(R.string.report_thanks, domain) else context.getString(R.string.report_failed),
                         Toast.LENGTH_SHORT,
                     ).show()
                     sending = false
                     if (ok) onDismiss()
                 }
-            }) { Text(if (sending) "Enviando…" else "Enviar") }
+            }) { Text(stringResource(if (sending) R.string.report_sending else R.string.report_send)) }
         },
-        dismissButton = { TextButton(enabled = !sending, onClick = onDismiss) { Text("Cancelar") } },
+        dismissButton = { TextButton(enabled = !sending, onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) } },
     )
 }
 

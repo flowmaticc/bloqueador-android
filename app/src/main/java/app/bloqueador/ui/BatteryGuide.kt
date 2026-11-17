@@ -1,5 +1,7 @@
 package app.bloqueador.ui
 
+import app.bloqueador.R
+import androidx.compose.ui.res.stringResource
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -38,33 +40,24 @@ object BatteryGuide {
     }
 
     /** Pasos adicionales según el fabricante (además de "Sin restricciones"). */
-    fun manufacturerSteps(): String? = when (Build.MANUFACTURER.lowercase()) {
-        "samsung" ->
-            "Samsung: Ajustes → Batería → Límites de uso en segundo plano → \"Aplicaciones que nunca " +
-                "entran en suspensión\" → añade Garbillo."
-        "xiaomi", "redmi", "poco" ->
-            "Xiaomi: Ajustes → Aplicaciones → Garbillo → Ahorro de batería → \"Sin restricciones\"."
-        "oppo", "realme", "oneplus" ->
-            "OPPO/Realme/OnePlus: Ajustes → Batería → Garbillo → permite la actividad en segundo plano."
+    fun manufacturerSteps(context: Context): String? = when (Build.MANUFACTURER.lowercase()) {
+        "samsung" -> R.string.battery_samsung
+        "xiaomi", "redmi", "poco" -> R.string.battery_xiaomi
+        "oppo", "realme", "oneplus" -> R.string.battery_oppo
         else -> null
-    }
+    }?.let(context::getString)
 
     /**
      * Fabricantes que, además del ahorro de batería, bloquean que una app se active sola (al encender
      * el móvil o tras actualizarla) si no tiene permiso de "Inicio automático". null si no hace falta.
      */
-    fun autostartSteps(): String? = when (Build.MANUFACTURER.lowercase()) {
-        "xiaomi", "redmi", "poco" ->
-            "Ajustes → Aplicaciones → Administrar aplicaciones → Garbillo → activa \"Inicio automático\"."
-        "huawei", "honor" ->
-            "Ajustes → Batería → Inicio de aplicaciones → Garbillo → \"Gestionar manualmente\" y activa " +
-                "las tres opciones."
-        "oppo", "realme", "oneplus" ->
-            "Ajustes → Aplicaciones → Garbillo → activa \"Inicio automático\" (o \"Permitir inicio automático\")."
-        "vivo", "iqoo" ->
-            "Ajustes → Batería → Consumo en segundo plano → Garbillo, y en i Manager → Inicio automático → Garbillo."
+    fun autostartSteps(context: Context): String? = when (Build.MANUFACTURER.lowercase()) {
+        "xiaomi", "redmi", "poco" -> R.string.autostart_xiaomi
+        "huawei", "honor" -> R.string.autostart_huawei
+        "oppo", "realme", "oneplus" -> R.string.autostart_oppo
+        "vivo", "iqoo" -> R.string.autostart_vivo
         else -> null
-    }
+    }?.let(context::getString)
 
     /** Abre la pantalla de inicio automático del fabricante, o la ficha de la app si no se puede. */
     fun openAutostart(context: Context) {
@@ -108,24 +101,23 @@ object BatteryGuide {
 @Composable
 fun AutostartCard() {
     val context = LocalContext.current
-    val steps = remember { BatteryGuide.autostartSteps() } ?: return
+    val steps = remember { BatteryGuide.autostartSteps(context) } ?: return
     val prefs = remember { context.getSharedPreferences("settings", Context.MODE_PRIVATE) }
     var dismissed by remember { mutableStateOf(prefs.getBoolean("autostart_guide_dismissed", false)) }
     if (dismissed) return
 
-    SectionCard("Permite el inicio automático") {
+    SectionCard(stringResource(R.string.autostart_card_title)) {
         Text(
-            "En este móvil, el sistema no deja que Garbillo se vuelva a activar solo al encender el móvil " +
-                "o después de actualizarse si no tiene permiso de \"Inicio automático\".",
+            stringResource(R.string.autostart_card_text),
             style = MaterialTheme.typography.bodyMedium,
         )
         Text(steps, style = MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { BatteryGuide.openAutostart(context) }) { Text("Abrir ajustes") }
+            Button(onClick = { BatteryGuide.openAutostart(context) }) { Text(stringResource(R.string.common_open_settings)) }
             TextButton(onClick = {
                 dismissed = true
                 prefs.edit().putBoolean("autostart_guide_dismissed", true).apply()
-            }) { Text("Ya lo hice") }
+            }) { Text(stringResource(R.string.common_done_it)) }
         }
     }
 }
@@ -145,20 +137,18 @@ fun BatteryGuideCard() {
     }
     if (!optimized || dismissed) return
 
-    SectionCard("Que Android no cierre el filtro") {
+    SectionCard(stringResource(R.string.battery_card_title)) {
         Text(
-            "El ahorro de batería del sistema puede cerrar el filtro cuando no usas el móvil. " +
-                "Garbillo apenas gasta (está dormido hasta que llega una consulta), así que es seguro " +
-                "excluirlo: busca Garbillo en la lista y elige \"No optimizar\" o \"Sin restricciones\".",
+            stringResource(R.string.battery_card_text),
             style = MaterialTheme.typography.bodyMedium,
         )
-        BatteryGuide.manufacturerSteps()?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        BatteryGuide.manufacturerSteps(context)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { BatteryGuide.openSettings(context) }) { Text("Abrir ajustes") }
+            Button(onClick = { BatteryGuide.openSettings(context) }) { Text(stringResource(R.string.common_open_settings)) }
             TextButton(onClick = {
                 dismissed = true
                 prefs.edit().putBoolean("battery_guide_dismissed", true).apply()
-            }) { Text("Ya lo hice") }
+            }) { Text(stringResource(R.string.common_done_it)) }
         }
     }
 }

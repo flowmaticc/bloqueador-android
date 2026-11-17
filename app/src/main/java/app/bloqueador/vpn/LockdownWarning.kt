@@ -57,13 +57,12 @@ object LockdownWarning {
             PackageManager.PERMISSION_GRANTED
         ) return
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "Avisos del filtro", NotificationManager.IMPORTANCE_DEFAULT)
+            NotificationChannel(CHANNEL_ID, context.getString(R.string.notif_ch_filter_alerts), NotificationManager.IMPORTANCE_DEFAULT)
         )
-        val text = "Está activado \"Bloquear conexiones sin VPN\" y con Garbillo eso corta todo internet. " +
-            "Toca, entra en el engranaje de Garbillo y desactiva esa opción (deja \"VPN siempre activa\")."
+        val text = context.getString(R.string.notif_lockdown_text)
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_garbillo)
-            .setContentTitle("Sin internet por un ajuste de Android")
+            .setContentTitle(context.getString(R.string.notif_lockdown_title))
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setPriority(NotificationCompat.PRIORITY_HIGH)

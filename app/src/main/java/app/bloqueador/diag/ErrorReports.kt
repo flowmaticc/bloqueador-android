@@ -89,7 +89,7 @@ object ErrorReports {
 
     /** Texto para "Ver qué se enviaría". */
     fun preview(context: Context): String =
-        payload(context)?.toString(2) ?: "No hay ningún error pendiente de enviar."
+        payload(context)?.toString(2) ?: context.getString(app.bloqueador.R.string.reports_nothing_pending)
 
     fun clear(context: Context) {
         synchronized(lock) { File(context.filesDir, FILE).delete() }

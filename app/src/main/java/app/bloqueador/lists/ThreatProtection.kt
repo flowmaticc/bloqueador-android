@@ -1,5 +1,7 @@
 package app.bloqueador.lists
 
+import app.bloqueador.R
+import app.bloqueador.UiText
 /**
  * Protección contra amenazas: phishing, malware, estafas, criptominado y webs falsas, con las
  * listas "Threat Intelligence Feeds" de Hagezi.
@@ -8,17 +10,14 @@ package app.bloqueador.lists
  * marcarlos en el historial). La lista Pro ya incluye las de webs falsas y ventanas emergentes
  * maliciosas de Hagezi; las de amenazas añaden cientos de miles de dominios que Pro no tiene.
  */
-enum class ThreatLevel(val label: String, val description: String, val source: ListSource) {
+enum class ThreatLevel(val label: UiText, val description: UiText, val source: ListSource) {
     STANDARD(
-        "Estándar",
-        "La recomendada para móviles: las amenazas más activas. Unos 10 MB de memoria.",
-        ListSource("amenazas", "Hagezi Threat Intelligence (media)", "", "$HAGEZI_URL/tif.medium.txt"),
+        UiText.res(R.string.threat_standard), UiText.res(R.string.threat_standard_desc),
+        ListSource("amenazas", UiText.res(R.string.list_tif_medium), UiText.EMPTY, "$HAGEZI_URL/tif.medium.txt"),
     ),
     MAX(
-        "Máxima",
-        "Todas las amenazas conocidas (más de un millón de dominios). Unos 40 MB de memoria: " +
-            "solo para móviles con memoria de sobra.",
-        ListSource("amenazas_max", "Hagezi Threat Intelligence (completa)", "", "$HAGEZI_URL/tif.txt"),
+        UiText.res(R.string.threat_max), UiText.res(R.string.threat_max_desc),
+        ListSource("amenazas_max", UiText.res(R.string.list_tif_full), UiText.EMPTY, "$HAGEZI_URL/tif.txt"),
     ),
 }
 

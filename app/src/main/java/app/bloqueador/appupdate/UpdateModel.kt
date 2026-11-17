@@ -1,5 +1,7 @@
 package app.bloqueador.appupdate
 
+import app.bloqueador.R
+import app.bloqueador.UiText
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Instant
@@ -8,9 +10,9 @@ import java.time.Instant
  * Canal de actualizaciones de la app. Beta incluye también las estables: siempre se ofrece la más
  * nueva de las dos. (Hasta la 0.3.x hubo un tercer canal, Nightly, que ahora es Beta.)
  */
-enum class UpdateChannel(val label: String, val description: String) {
-    STABLE("Estable", "Solo versiones finales, ya probadas."),
-    BETA("Beta", "Cada cambio nuevo en cuanto se hace, antes de ser estable. Para probar lo último; puede fallar.");
+enum class UpdateChannel(val label: UiText, val description: UiText) {
+    STABLE(UiText.res(R.string.channel_stable), UiText.res(R.string.channel_stable_desc)),
+    BETA(UiText.res(R.string.channel_beta), UiText.res(R.string.channel_beta_desc));
 
     /** ¿Acepta este canal una publicación del canal [other]? */
     fun accepts(other: UpdateChannel): Boolean = other.ordinal <= ordinal

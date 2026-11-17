@@ -1,5 +1,6 @@
 package app.bloqueador.history
 
+import app.bloqueador.R
 import android.content.Context
 import android.net.ConnectivityManager
 import android.os.Build
@@ -118,8 +119,8 @@ object RuleOrigin {
             val threat = app.bloqueador.filter.FilterEngine.isThreat(rule)
             val rule = app.bloqueador.filter.FilterEngine.plainRule(rule)
             val domain = rule.removePrefix("||").removeSuffix("^")
-            if (rule.startsWith("||") && domain in settings.blockedDomains) origins += "Tus bloqueos propios"
-            if (domain == "use-application-dns.net") origins += "Regla interna (desactiva el DNS cifrado de Firefox)"
+            if (rule.startsWith("||") && domain in settings.blockedDomains) origins += context.getString(R.string.origin_own_blocks)
+            if (domain == "use-application-dns.net") origins += context.getString(R.string.origin_internal_rule)
             val sources = if (threat) listOfNotNull(repository.threatSource()) else repository.activeSources()
             for (source in sources) {
                 val file = java.io.File(context.filesDir, "lists/${source.id}.txt")
@@ -131,7 +132,7 @@ object RuleOrigin {
                             (!rule.startsWith("||") && l == rule)
                     }
                 }
-                if (found) origins += source.label
+                if (found) origins += source.label.get(context)
             }
             origins
         }

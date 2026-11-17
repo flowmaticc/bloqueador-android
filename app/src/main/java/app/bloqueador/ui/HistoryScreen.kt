@@ -1,5 +1,8 @@
 package app.bloqueador.ui
 
+import app.bloqueador.R
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import app.bloqueador.settings.AppSettings
 import android.content.Context
 import android.content.pm.PackageManager
@@ -73,18 +76,16 @@ fun HistoryScreen(onBack: () -> Unit, startWithThreats: Boolean = false) {
             .safeDrawingPadding()
             .padding(horizontal = 16.dp),
     ) {
-        ScreenHeader("Historial", onBack)
+        ScreenHeader(stringResource(R.string.hist_title), onBack)
         if (!app.settings.historyEnabled) {
             Text(
-                "El historial está desactivado. Puedes activarlo en Ajustes.",
+                stringResource(R.string.hist_disabled),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error,
             )
         }
         Text(
-            app.settings.historyRetention.let { if (it.hours == 1L) "Última hora" else "Últimas ${it.label}" } +
-                ". Toca una entrada para ver el detalle, " +
-                "permitirla o bloquearla.",
+            app.settings.historyRetention.hours.toInt().let { pluralStringResource(R.plurals.hist_last_hours, it, it) },
             style = MaterialTheme.typography.bodySmall,
         )
         Row(
@@ -94,20 +95,20 @@ fun HistoryScreen(onBack: () -> Unit, startWithThreats: Boolean = false) {
                 .horizontalScroll(rememberScrollState()),
         ) {
             HistoryFilter.entries.forEach { f ->
-                FilterChip(selected = f == filter, onClick = { filter = f }, label = { Text(f.label) })
+                FilterChip(selected = f == filter, onClick = { filter = f }, label = { Text(f.label.get()) })
             }
         }
         appFilter?.let { pkg ->
             InputChip(
                 selected = true,
                 onClick = { appFilter = null },
-                label = { Text("Solo ${appLabel(context, pkg)}  ✕") },
+                label = { Text(stringResource(R.string.hist_only_app, appLabel(context, pkg))) },
             )
         }
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
-            label = { Text("Buscar dominio o app") },
+            label = { Text(stringResource(R.string.hist_search)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
         )
@@ -124,8 +125,7 @@ fun HistoryScreen(onBack: () -> Unit, startWithThreats: Boolean = false) {
             if (visible.isEmpty()) {
                 Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     Text(
-                        if (all.isEmpty()) "Todavía no hay nada. Activa el filtro y usa el móvil con normalidad."
-                        else "No hay entradas que coincidan.",
+                        stringResource(if (all.isEmpty()) R.string.hist_empty else R.string.hist_no_match),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -173,15 +173,18 @@ private fun HistoryRow(event: HistoryEvent, onClick: () -> Unit) {
         Column(Modifier.weight(1f)) {
             Text(event.domain, maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Medium)
             Text(
-                appLabel(context, pkg) + " · " + relativeTime(event.timestamp) +
-                    if (event.count > 1) " · ×${event.count}" else "",
+                if (event.count > 1) {
+                    stringResource(R.string.hist_row_count, appLabel(context, pkg), relativeTime(context, event.timestamp), event.count)
+                } else {
+                    stringResource(R.string.hist_row, appLabel(context, pkg), relativeTime(context, event.timestamp))
+                },
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
         }
         Text(
-            statusLabel(event),
+            stringResource(statusLabel(event)),
             style = MaterialTheme.typography.labelMedium,
             color = if (event.blocked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
         )
@@ -221,21 +224,19 @@ private fun HistoryDetailDialog(
     if (confirmThreat) {
         AlertDialog(
             onDismissRequest = { confirmThreat = false },
-            title = { Text("¿Permitir un sitio peligroso?") },
+            title = { Text(stringResource(R.string.hist_allow_threat_title)) },
             text = {
                 Text(
-                    "${event.domain} está en la lista de amenazas (phishing, malware o estafas). Si lo " +
-                        "permites, Garbillo dejará de protegerte frente a él en todas las apps. Hazlo solo " +
-                        "si estás seguro de que es un error de la lista; si no, mejor repórtalo."
+                    stringResource(R.string.hist_allow_threat_text, event.domain)
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
                     confirmThreat = false
-                    apply("${event.domain} permitido") { settings.allowedDomains = settings.allowedDomains + listOfNotNull(AppSettings.cleanDomain(event.domain)) }
-                }) { Text("Permitir de todas formas") }
+                    apply(context.getString(R.string.hist_allowed_toast, event.domain)) { settings.allowedDomains = settings.allowedDomains + listOfNotNull(AppSettings.cleanDomain(event.domain)) }
+                }) { Text(stringResource(R.string.hist_allow_anyway)) }
             },
-            dismissButton = { TextButton(onClick = { confirmThreat = false }) { Text("Cancelar") } },
+            dismissButton = { TextButton(onClick = { confirmThreat = false }) { Text(stringResource(R.string.common_cancel)) } },
         )
     }
     if (reporting) {
@@ -254,37 +255,35 @@ private fun HistoryDetailDialog(
         title = { Text(event.domain) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Detail("Resultado", statusLabel(event))
+                Detail(stringResource(R.string.hist_result), stringResource(statusLabel(event)))
                 if (FilterEngine.isThreat(event.matchedRule)) {
                     Text(
-                        "Está en la lista de amenazas (phishing, malware o estafas). Solo permítelo si estás " +
-                            "seguro de que es de confianza.",
+                        stringResource(R.string.hist_threat_warning),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
                 }
-                Detail("App", appLabel(context, event.appPackage) + (event.appPackage?.let { "\n$it" } ?: ""))
+                Detail(stringResource(R.string.hist_app), appLabel(context, event.appPackage) + (event.appPackage?.let { "\n$it" } ?: ""))
                 Detail(
-                    "Hora",
+                    stringResource(R.string.hist_time),
                     DateFormat.getTimeInstance(DateFormat.MEDIUM).format(Date(event.timestamp)) +
-                        if (event.count > 1) " (${event.count} consultas)" else "",
+                        if (event.count > 1) " (" + pluralStringResource(R.plurals.hist_queries, event.count, event.count) + ")" else "",
                 )
                 if (event.matchedRule != null) {
-                    Detail("Regla", FilterEngine.plainRule(event.matchedRule))
+                    Detail(stringResource(R.string.hist_rule), FilterEngine.plainRule(event.matchedRule))
                     Detail(
-                        "Lista",
+                        stringResource(R.string.hist_list),
                         when {
-                            origins == null -> "Buscando…"
-                            origins!!.isEmpty() -> "Ya no está en ninguna lista activa"
+                            origins == null -> stringResource(R.string.hist_searching)
+                            origins!!.isEmpty() -> stringResource(R.string.hist_no_list)
                             else -> origins!!.joinToString(", ")
                         },
                     )
                 }
-                if (userAllow != null) Detail("Tu excepción", userAllow)
-                if (userBlock != null) Detail("Tu bloqueo", userBlock)
+                if (userAllow != null) Detail(stringResource(R.string.hist_your_exception), userAllow)
+                if (userBlock != null) Detail(stringResource(R.string.hist_your_block), userBlock)
                 Text(
-                    "Recuerda: Android guarda las respuestas unos minutos. Si una app sigue sin funcionar " +
-                        "tras permitir un dominio, ciérrala y vuelve a abrirla.",
+                    stringResource(R.string.hist_cache_note),
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -293,29 +292,29 @@ private fun HistoryDetailDialog(
             Column(horizontalAlignment = Alignment.End) {
                 // Un sitio marcado como peligroso no se abre ni en la vista previa.
                 if (!FilterEngine.isThreat(event.matchedRule)) {
-                    TextButton(onClick = onPreview) { Text("Ver en la web") }
+                    TextButton(onClick = onPreview) { Text(stringResource(R.string.hist_view_web)) }
                 }
-                TextButton(onClick = { reporting = true }) { Text("Reportar para analizar") }
+                TextButton(onClick = { reporting = true }) { Text(stringResource(R.string.report_title)) }
                 when {
                     userAllow != null -> TextButton(onClick = {
-                        apply("Excepción quitada") { settings.allowedDomains = settings.allowedDomains - userAllow }
-                    }) { Text("Quitar excepción") }
+                        apply(context.getString(R.string.hist_exception_removed)) { settings.allowedDomains = settings.allowedDomains - userAllow }
+                    }) { Text(stringResource(R.string.hist_remove_exception)) }
                     userBlock != null -> TextButton(onClick = {
-                        apply("Bloqueo quitado") { settings.blockedDomains = settings.blockedDomains - userBlock }
-                    }) { Text("Quitar mi bloqueo") }
+                        apply(context.getString(R.string.hist_block_removed)) { settings.blockedDomains = settings.blockedDomains - userBlock }
+                    }) { Text(stringResource(R.string.hist_remove_block)) }
                     event.blocked && FilterEngine.isThreat(event.matchedRule) ->
-                        TextButton(onClick = { confirmThreat = true }) { Text("Permitir siempre…") }
+                        TextButton(onClick = { confirmThreat = true }) { Text(stringResource(R.string.hist_allow_always_dots)) }
                     event.blocked -> TextButton(onClick = {
-                        apply("${event.domain} permitido") { settings.allowedDomains = settings.allowedDomains + listOfNotNull(AppSettings.cleanDomain(event.domain)) }
-                    }) { Text("Permitir siempre") }
+                        apply(context.getString(R.string.hist_allowed_toast, event.domain)) { settings.allowedDomains = settings.allowedDomains + listOfNotNull(AppSettings.cleanDomain(event.domain)) }
+                    }) { Text(stringResource(R.string.hist_allow_always)) }
                     else -> TextButton(onClick = {
-                        apply("${event.domain} bloqueado") { settings.blockedDomains = settings.blockedDomains + listOfNotNull(AppSettings.cleanDomain(event.domain)) }
-                    }) { Text("Bloquear siempre") }
+                        apply(context.getString(R.string.hist_blocked_toast, event.domain)) { settings.blockedDomains = settings.blockedDomains + listOfNotNull(AppSettings.cleanDomain(event.domain)) }
+                    }) { Text(stringResource(R.string.hist_block_always)) }
                 }
                 if (event.appPackage != null) {
-                    TextButton(onClick = onFilterApp) { Text("Ver solo esta app") }
+                    TextButton(onClick = onFilterApp) { Text(stringResource(R.string.hist_only_this_app)) }
                 }
-                TextButton(onClick = onDismiss) { Text("Cerrar") }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) }
             }
         },
     )
@@ -329,18 +328,18 @@ private fun Detail(label: String, value: String) {
     }
 }
 
-private fun statusLabel(e: HistoryEvent): String = when {
-    FilterEngine.isThreat(e.matchedRule) -> "Peligro"
-    e.blocked -> "Bloqueada"
-    else -> "Permitida"
+private fun statusLabel(e: HistoryEvent): Int = when {
+    FilterEngine.isThreat(e.matchedRule) -> R.string.status_danger
+    e.blocked -> R.string.status_blocked
+    else -> R.string.status_allowed
 }
 
 private val labelCache = ConcurrentHashMap<String, String>()
 
 /** Nombre visible de una app ("Chrome"), con caché. */
 fun appLabel(context: Context, packageName: String?): String {
-    if (packageName == null) return "App desconocida"
-    if (packageName == AppResolver.SYSTEM_PACKAGE) return "Sistema Android"
+    if (packageName == null) return context.getString(R.string.app_unknown)
+    if (packageName == AppResolver.SYSTEM_PACKAGE) return context.getString(R.string.app_system)
     return labelCache.getOrPut(packageName) {
         try {
             val pm = context.packageManager

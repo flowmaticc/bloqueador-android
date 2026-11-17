@@ -1,10 +1,12 @@
 package app.bloqueador.apps
 
+import app.bloqueador.R
+import app.bloqueador.UiText
 /** Qué apps pasan por el filtro. */
-enum class AppStrategy(val label: String, val description: String) {
-    ALL("Todas las apps", "Se filtra todo el dispositivo."),
-    ALL_EXCEPT("Todas excepto las que elija", "Se filtra todo salvo las apps que marques."),
-    ONLY("Solo las que elija", "Solo se filtran las apps que marques."),
+enum class AppStrategy(val label: UiText, val description: UiText) {
+    ALL(UiText.res(R.string.strategy_all), UiText.res(R.string.strategy_all_desc)),
+    ALL_EXCEPT(UiText.res(R.string.strategy_except), UiText.res(R.string.strategy_except_desc)),
+    ONLY(UiText.res(R.string.strategy_only), UiText.res(R.string.strategy_only_desc)),
 }
 
 /**

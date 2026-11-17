@@ -1,5 +1,7 @@
 package app.bloqueador.history
 
+import app.bloqueador.R
+import app.bloqueador.UiText
 import android.content.Context
 import androidx.room.Dao
 import androidx.room.Database
@@ -37,8 +39,9 @@ data class HistoryEvent(
 data class DomainAt(val domain: String, val timestamp: Long)
 
 /** Qué entradas mostrar en la lista. */
-enum class HistoryFilter(val label: String) {
-    BLOCKED("Bloqueadas"), THREATS("Amenazas"), ALLOWED("Permitidas"), ALL("Todas")
+enum class HistoryFilter(val label: UiText) {
+    BLOCKED(UiText.res(R.string.filter_blocked)), THREATS(UiText.res(R.string.filter_threats)),
+    ALLOWED(UiText.res(R.string.filter_allowed)), ALL(UiText.res(R.string.filter_all))
 }
 
 @Dao

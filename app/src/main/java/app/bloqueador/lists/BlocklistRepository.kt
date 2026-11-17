@@ -1,5 +1,7 @@
 package app.bloqueador.lists
 
+import app.bloqueador.R
+import app.bloqueador.UiText
 import android.content.Context
 import app.bloqueador.filter.BlocklistParser
 import app.bloqueador.filter.DomainMatcher
@@ -22,7 +24,8 @@ data class UpdateResult(val changed: Boolean, val errors: List<String>) {
 }
 
 /** Una lista descargable. [id] es también el nombre del fichero local. */
-data class ListSource(val id: String, val label: String, val description: String, val url: String)
+/** [label] y [description] se muestran en la app; los nombres propios de las listas no se traducen. */
+data class ListSource(val id: String, val label: UiText, val description: UiText, val url: String)
 
 private const val HAGEZI = HAGEZI_URL
 
@@ -33,18 +36,18 @@ private const val HAGEZI = HAGEZI_URL
  * descarta porque bloquea prácticamente los mismos anuncios que la Light. El id de cada lista es
  * también el nombre del fichero en disco.
  */
-enum class BlockMode(val label: String, val description: String, val source: ListSource) {
+enum class BlockMode(val label: UiText, val description: UiText, val source: ListSource) {
     LIGHT(
-        "Ligero", "Máxima compatibilidad. Riesgo muy bajo de que algo deje de funcionar.",
-        ListSource("light", "Hagezi Light", "", "$HAGEZI/light.txt"),
+        UiText.res(R.string.mode_light), UiText.res(R.string.mode_light_desc),
+        ListSource("light", UiText.raw("Hagezi Light"), UiText.EMPTY, "$HAGEZI/light.txt"),
     ),
     BALANCED(
-        "Equilibrado", "Para el día a día: configurar y olvidar. Bloquea bien sin romper nada habitual.",
-        ListSource("pro", "Hagezi Pro", "", "$HAGEZI/pro.txt"),
+        UiText.res(R.string.mode_balanced), UiText.res(R.string.mode_balanced_desc),
+        ListSource("pro", UiText.raw("Hagezi Pro"), UiText.EMPTY, "$HAGEZI/pro.txt"),
     ),
     STRICT(
-        "Estricto", "Privacidad agresiva. Puede romper alguna app o enlace.",
-        ListSource("proplus", "Hagezi Pro++", "", "$HAGEZI/pro.plus.txt"),
+        UiText.res(R.string.mode_strict), UiText.res(R.string.mode_strict_desc),
+        ListSource("proplus", UiText.raw("Hagezi Pro++"), UiText.EMPTY, "$HAGEZI/pro.plus.txt"),
     ),
 }
 
@@ -52,28 +55,23 @@ enum class BlockMode(val label: String, val description: String, val source: Lis
 object ExtraLayers {
     val all = listOf(
         ListSource(
-            "doh", "Anti-evasión DNS",
-            "Bloquea servidores de DNS cifrado para que navegadores y apps no se salten el filtro.",
+            "doh", UiText.res(R.string.layer_doh), UiText.res(R.string.layer_doh_desc),
             "$HAGEZI/doh.txt",
         ),
         ListSource(
-            "goodbyeads", "Juegos y apps gratis",
-            "Anuncios de juegos y apps gratuitas (lista GoodbyeAds). Puede romper alguna recompensa por ver anuncios.",
+            "goodbyeads", UiText.res(R.string.layer_games), UiText.res(R.string.layer_games_desc),
             "https://raw.githubusercontent.com/jerryn70/GoodbyeAds/master/Hosts/GoodbyeAds.txt",
         ),
         ListSource(
-            "1hosts", "1Hosts Lite",
-            "Alternativa ligera centrada en anuncios y rastreo.",
+            "1hosts", UiText.raw("1Hosts Lite"), UiText.res(R.string.layer_1hosts_desc),
             "https://raw.githubusercontent.com/badmojr/1Hosts/master/Lite/adblock.txt",
         ),
         ListSource(
-            "adaway", "AdAway",
-            "Lista clásica y conservadora para móviles.",
+            "adaway", UiText.raw("AdAway"), UiText.res(R.string.layer_adaway_desc),
             "https://adaway.org/hosts.txt",
         ),
         ListSource(
-            "stevenblack", "StevenBlack",
-            "Lista unificada de amplia cobertura.",
+            "stevenblack", UiText.raw("StevenBlack"), UiText.res(R.string.layer_stevenblack_desc),
             "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
         ),
     )
@@ -88,17 +86,16 @@ object ExtraLayers {
     fun vendorFor(manufacturer: String?): ListSource? {
         val m = manufacturer.orEmpty().lowercase()
         val (file, brand) = when {
-            m.contains("samsung") -> "native.samsung" to "Samsung"
-            m.contains("xiaomi") || m.contains("redmi") || m.contains("poco") -> "native.xiaomi" to "Xiaomi"
-            m.contains("oppo") || m.contains("realme") || m.contains("oneplus") -> "native.oppo-realme" to "Oppo, Realme y OnePlus"
-            m.contains("huawei") || m.contains("honor") -> "native.huawei" to "Huawei"
-            m.contains("vivo") || m.contains("iqoo") -> "native.vivo" to "Vivo"
-            m.contains("amazon") -> "native.amazon" to "Amazon"
+            m.contains("samsung") -> "native.samsung" to UiText.raw("Samsung")
+            m.contains("xiaomi") || m.contains("redmi") || m.contains("poco") -> "native.xiaomi" to UiText.raw("Xiaomi")
+            m.contains("oppo") || m.contains("realme") || m.contains("oneplus") -> "native.oppo-realme" to UiText.res(R.string.vendor_oppo)
+            m.contains("huawei") || m.contains("honor") -> "native.huawei" to UiText.raw("Huawei")
+            m.contains("vivo") || m.contains("iqoo") -> "native.vivo" to UiText.raw("Vivo")
+            m.contains("amazon") -> "native.amazon" to UiText.raw("Amazon")
             else -> return null
         }
         return ListSource(
-            "vendor", "Fabricante: $brand",
-            "Publicidad y rastreo del propio sistema de tu móvil $brand.",
+            "vendor", UiText.res(R.string.layer_vendor, brand), UiText.res(R.string.layer_vendor_desc, brand),
             "$HAGEZI/$file.txt",
         )
     }
@@ -112,6 +109,10 @@ object ExtraLayers {
  * reglas propias del usuario. La comprobación periódica la programa ListUpdateScheduler.
  */
 class BlocklistRepository(context: Context, private val settings: AppSettings) {
+
+    /** Para los mensajes de error (en el idioma de la app). */
+    private val appContext: Context = context.applicationContext
+    private fun ListSource.name(): String = label.get(appContext)
 
     private val dir = File(context.filesDir, "lists").apply { mkdirs() }
     private val prefs = context.getSharedPreferences("lists", Context.MODE_PRIVATE)
@@ -209,7 +210,7 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                errors += e.message ?: "${source.label}: error desconocido"
+                errors += e.message ?: appContext.getString(R.string.list_err_unknown, source.name())
             }
         }
         return UpdateResult(changed, errors)
@@ -270,7 +271,7 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
                                 val n = input.read(buf)
                                 if (n < 0) break
                                 total += n
-                                if (total > MAX_LIST_BYTES) throw IOException("${source.label}: lista demasiado grande")
+                                if (total > MAX_LIST_BYTES) throw IOException(appContext.getString(R.string.list_err_too_big, source.name()))
                                 out.write(buf, 0, n)
                             }
                         }
@@ -278,11 +279,11 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
                     val newCount = tmp.bufferedReader().useLines { BlocklistParser.parse(it).ruleCount }
                     val oldCount = prefs.getInt(countKey, 0)
                     if (newCount < MIN_RULES || newCount < oldCount / 2) {
-                        throw IOException("${source.label}: lista descartada ($newCount reglas, antes $oldCount)")
+                        throw IOException(appContext.getString(R.string.list_err_discarded, source.name(), newCount, oldCount))
                     }
                     if (!tmp.renameTo(target)) {
                         target.delete()
-                        if (!tmp.renameTo(target)) throw IOException("No se pudo guardar ${source.label}")
+                        if (!tmp.renameTo(target)) throw IOException(appContext.getString(R.string.list_err_save, source.name()))
                     }
                     prefs.edit()
                         .putString(etagKey, conn.getHeaderField("ETag"))
@@ -291,7 +292,7 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
                         .apply()
                     true
                 }
-                else -> throw IOException("${source.label}: HTTP $code")
+                else -> throw IOException(appContext.getString(R.string.list_err_http, source.name(), code))
             }
         } finally {
             conn.disconnect()

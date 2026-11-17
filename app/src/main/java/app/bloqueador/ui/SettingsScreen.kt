@@ -1,5 +1,9 @@
 package app.bloqueador.ui
 
+import app.bloqueador.AppLanguage
+import app.bloqueador.UiText
+import app.bloqueador.R
+import androidx.compose.ui.res.stringResource
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
@@ -62,66 +66,75 @@ import java.text.Normalizer
  * Categorías de Ajustes. La pantalla principal solo muestra estas filas (con un resumen del valor
  * actual); cada una abre su propia pantalla. Así la lista no crece aunque se añadan ajustes.
  */
-enum class SettingsSection(val title: String, val group: String) {
-    MODE("Nivel de bloqueo", "Protección"),
-    SECURITY("Protección contra amenazas", "Protección"),
-    LAYERS("Listas adicionales", "Protección"),
-    APPS("Apps protegidas", "Protección"),
-    RULES("Mis excepciones y bloqueos", "Protección"),
-    ENCRYPTED_DNS("DNS cifrado", "Protección"),
-    LIST_UPDATES("Actualización de listas", "Funcionamiento"),
-    HISTORY("Historial", "Funcionamiento"),
-    BATTERY("Batería y arranque", "Funcionamiento"),
-    APP_UPDATES("Actualizaciones de la app", "Aplicación"),
-    ERROR_REPORTS("Informes de errores", "Aplicación"),
-    HELP("Qué puede y qué no puede bloquear", "Aplicación"),
-    ABOUT("Acerca de", "Aplicación"),
+enum class SettingsSection(@androidx.annotation.StringRes val title: Int, @androidx.annotation.StringRes val group: Int) {
+    MODE(R.string.sec_mode, R.string.group_protection),
+    SECURITY(R.string.sec_security, R.string.group_protection),
+    LAYERS(R.string.sec_layers, R.string.group_protection),
+    APPS(R.string.sec_apps, R.string.group_protection),
+    RULES(R.string.sec_rules, R.string.group_protection),
+    ENCRYPTED_DNS(R.string.sec_encrypted_dns, R.string.group_protection),
+    LIST_UPDATES(R.string.sec_list_updates, R.string.group_operation),
+    HISTORY(R.string.sec_history, R.string.group_operation),
+    BATTERY(R.string.sec_battery, R.string.group_operation),
+    LANGUAGE(R.string.sec_language, R.string.group_app),
+    APP_UPDATES(R.string.sec_app_updates, R.string.group_app),
+    ERROR_REPORTS(R.string.sec_error_reports, R.string.group_app),
+    HELP(R.string.sec_help, R.string.group_app),
+    ABOUT(R.string.sec_about, R.string.group_app),
 }
 
 /** Secciones que muestra esta variante (la de F-Droid no tiene actualizador propio). */
 fun visibleSections(selfUpdate: Boolean = BuildConfig.SELF_UPDATE): List<SettingsSection> =
     SettingsSection.entries.filter { selfUpdate || it != SettingsSection.APP_UPDATES }
 
-/** Un ajuste concreto para el buscador: dónde está y palabras con las que se puede encontrar. */
-data class SettingEntry(val section: SettingsSection, val title: String, val keywords: String)
+/**
+ * Un ajuste concreto para el buscador: dónde está, su título y palabras con las que se puede encontrar.
+ * Título y palabras están en los ficheros de textos, así que el buscador funciona en cada idioma.
+ */
+data class SettingEntry(val section: SettingsSection, val title: UiText, val keywords: UiText)
 
 /** Índice del buscador. Al añadir un ajuste nuevo, añadirlo aquí también. */
 fun settingsIndex(manufacturer: String?): List<SettingEntry> = buildList {
-    add(SettingEntry(SettingsSection.MODE, "Nivel de bloqueo", "modo ligero equilibrado estricto agresividad hagezi pro lista base"))
-    add(SettingEntry(SettingsSection.SECURITY, "Protección contra amenazas", "seguridad phishing malware virus estafas fraude timo webs falsas criptominado peligroso ciberseguridad"))
-    add(SettingEntry(SettingsSection.SECURITY, "Avisos de sitios peligrosos", "notificacion alerta amenaza bloqueada"))
-    add(SettingEntry(SettingsSection.LAYERS, "Listas adicionales", "capas extra mas bloqueo"))
+    fun add(section: SettingsSection, title: Int, keywords: Int) = add(SettingEntry(section, UiText.res(title), UiText.res(keywords)))
+    add(SettingsSection.MODE, R.string.sec_mode, R.string.idx_mode_kw)
+    add(SettingsSection.SECURITY, R.string.sec_security, R.string.idx_security_kw)
+    add(SettingsSection.SECURITY, R.string.idx_threat_alerts, R.string.idx_threat_alerts_kw)
+    add(SettingsSection.LAYERS, R.string.sec_layers, R.string.idx_layers_kw)
     ExtraLayers.available(manufacturer).forEach {
-        add(SettingEntry(SettingsSection.LAYERS, it.label, it.description + " " + it.id))
+        add(SettingEntry(SettingsSection.LAYERS, it.label, UiText.res(R.string.kw_pair, it.description, it.id)))
     }
-    add(SettingEntry(SettingsSection.APPS, "Apps protegidas", "estrategia excluir excluidas banca pagos todas solo elegir apps"))
-    add(SettingEntry(SettingsSection.APPS, "Restaurar recomendado", "banca pagos por defecto"))
-    add(SettingEntry(SettingsSection.RULES, "Permitir siempre un dominio", "excepciones exclusiones lista blanca whitelist desbloquear"))
-    add(SettingEntry(SettingsSection.RULES, "Bloquear siempre un dominio", "bloqueos propios lista negra blacklist"))
-    add(SettingEntry(SettingsSection.ENCRYPTED_DNS, "DNS cifrado", "dot tls privado cifrar quad9 cloudflare mullvad operador espiar resolver servidor dns 853"))
-    add(SettingEntry(SettingsSection.LIST_UPDATES, "Frecuencia de actualización de listas", "12 24 horas manual automatica descargar"))
-    add(SettingEntry(SettingsSection.LIST_UPDATES, "Comprobar listas ahora", "actualizar descargar ya"))
-    add(SettingEntry(SettingsSection.LIST_UPDATES, "Descargar solo con wifi", "wifi datos moviles red medida consumo descargas tarifa"))
-    add(SettingEntry(SettingsSection.ERROR_REPORTS, "Informes de errores", "fallos errores cierres crash informe anonimo diagnostico ayudar mejorar enviar privacidad"))
-    add(SettingEntry(SettingsSection.HISTORY, "Guardar historial", "registro consultas activar desactivar"))
-    add(SettingEntry(SettingsSection.HISTORY, "Tiempo que se conserva el historial", "conservar retencion 1 3 6 24 horas"))
-    add(SettingEntry(SettingsSection.HISTORY, "Borrar historial", "eliminar limpiar"))
-    add(SettingEntry(SettingsSection.BATTERY, "Que Android no cierre el filtro", "bateria ahorro optimizacion sin restricciones se apaga"))
-    add(SettingEntry(SettingsSection.BATTERY, "Al encender el móvil", "arranque inicio encender reiniciar automatico activar solo inicio automatico autostart xiaomi huawei oppo vivo"))
-    add(SettingEntry(SettingsSection.BATTERY, "VPN siempre activa", "arranque inicio encender reiniciar automatico bloquear conexiones sin vpn"))
-    add(SettingEntry(SettingsSection.ABOUT, "Web y política de privacidad", "pagina privacidad datos permisos ayuda"))
-    add(SettingEntry(SettingsSection.APP_UPDATES, "Canal de actualizaciones", "estable beta nightly version actualizar app instalar"))
-    add(SettingEntry(SettingsSection.HELP, "Qué no puede bloquear", "youtube twitch instagram tiktok x twitter spotify redes sociales hueco brave firefox ublock"))
-    add(SettingEntry(SettingsSection.ABOUT, "Acerca de", "version licencia codigo fuente github privacidad"))
+    add(SettingsSection.APPS, R.string.sec_apps, R.string.idx_apps_kw)
+    add(SettingsSection.APPS, R.string.idx_restore, R.string.idx_restore_kw)
+    add(SettingsSection.RULES, R.string.idx_allow, R.string.idx_allow_kw)
+    add(SettingsSection.RULES, R.string.idx_block, R.string.idx_block_kw)
+    add(SettingsSection.ENCRYPTED_DNS, R.string.sec_encrypted_dns, R.string.idx_dns_kw)
+    add(SettingsSection.LIST_UPDATES, R.string.idx_frequency, R.string.idx_frequency_kw)
+    add(SettingsSection.LIST_UPDATES, R.string.idx_check_now, R.string.idx_check_now_kw)
+    add(SettingsSection.LIST_UPDATES, R.string.idx_wifi, R.string.idx_wifi_kw)
+    add(SettingsSection.ERROR_REPORTS, R.string.sec_error_reports, R.string.idx_reports_kw)
+    add(SettingsSection.HISTORY, R.string.idx_history_save, R.string.idx_history_save_kw)
+    add(SettingsSection.HISTORY, R.string.idx_history_keep, R.string.idx_history_keep_kw)
+    add(SettingsSection.HISTORY, R.string.idx_history_clear, R.string.idx_history_clear_kw)
+    add(SettingsSection.BATTERY, R.string.battery_card_title, R.string.idx_battery_kw)
+    add(SettingsSection.BATTERY, R.string.idx_boot, R.string.idx_boot_kw)
+    add(SettingsSection.BATTERY, R.string.idx_always_on, R.string.idx_always_on_kw)
+    add(SettingsSection.LANGUAGE, R.string.sec_language, R.string.idx_language_kw)
+    add(SettingsSection.ABOUT, R.string.idx_web, R.string.idx_web_kw)
+    add(SettingsSection.APP_UPDATES, R.string.idx_channel, R.string.idx_channel_kw)
+    add(SettingsSection.HELP, R.string.idx_limits, R.string.idx_limits_kw)
+    add(SettingsSection.ABOUT, R.string.sec_about, R.string.idx_about_kw)
 }
 
-/** Busca sin distinguir mayúsculas ni tildes; todas las palabras de [query] deben aparecer. */
-fun searchSettings(index: List<SettingEntry>, query: String): List<SettingEntry> {
+/**
+ * Busca sin distinguir mayúsculas ni tildes; todas las palabras de [query] deben aparecer.
+ * [text] traduce cada texto al idioma actual (en la app, con el contexto; en los tests, con el fichero).
+ */
+fun searchSettings(index: List<SettingEntry>, query: String, text: (UiText) -> String): List<SettingEntry> {
     val words = normalize(query).split(' ').filter { it.isNotBlank() }
     if (words.isEmpty()) return emptyList()
     return index.filter { e ->
-        val text = normalize("${e.title} ${e.section.title} ${e.keywords}")
-        words.all { it in text }
+        val all = normalize("${text(e.title)} ${text(UiText.res(e.section.title))} ${text(e.keywords)}")
+        words.all { it in all }
     }
 }
 
@@ -149,6 +162,7 @@ fun SettingsScreen(
 /** Pantalla principal de Ajustes: buscador + categorías agrupadas. */
 @Composable
 private fun SettingsHome(onBack: () -> Unit, onOpen: (SettingsSection) -> Unit) {
+    val context = LocalContext.current
     val settings = BloqueadorApp.instance.settings
     var query by rememberSaveable { mutableStateOf("") }
     val index = remember {
@@ -162,25 +176,25 @@ private fun SettingsHome(onBack: () -> Unit, onOpen: (SettingsSection) -> Unit) 
         Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        ScreenHeader("Ajustes", onBack)
+        ScreenHeader(stringResource(R.string.set_title), onBack)
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
-            label = { Text("Buscar en ajustes") },
+            label = { Text(stringResource(R.string.set_search)) },
             singleLine = true,
             trailingIcon = { if (query.isNotEmpty()) TextButton(onClick = { query = "" }) { Text("✕") } },
             modifier = Modifier.fillMaxWidth(),
         )
 
         if (query.isNotBlank()) {
-            val results = searchSettings(index, query)
+            val results = searchSettings(index, query) { it.get(context) }
             if (results.isEmpty()) {
-                Text("No hay ningún ajuste que coincida.", style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.set_no_match), style = MaterialTheme.typography.bodyMedium)
             } else {
                 Card(Modifier.fillMaxWidth()) {
                     results.forEachIndexed { i, e ->
                         if (i > 0) HorizontalDivider()
-                        NavRow(e.title, e.section.title) {
+                        NavRow(e.title.get(), stringResource(e.section.title)) {
                             // Se cierra el teclado antes de cambiar de pantalla: si no, la nueva
                             // reserva su hueco y en algunos Android queda cortada.
                             focus.clearFocus()
@@ -195,7 +209,7 @@ private fun SettingsHome(onBack: () -> Unit, onOpen: (SettingsSection) -> Unit) 
 
         visibleSections().groupBy { it.group }.forEach { (group, sections) ->
             Text(
-                group,
+                stringResource(group),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(top = 4.dp),
@@ -203,7 +217,7 @@ private fun SettingsHome(onBack: () -> Unit, onOpen: (SettingsSection) -> Unit) 
             Card(Modifier.fillMaxWidth()) {
                 sections.forEachIndexed { i, s ->
                     if (i > 0) HorizontalDivider()
-                    NavRow(s.title, sectionSummary(s, settings)) { onOpen(s) }
+                    NavRow(stringResource(s.title), sectionSummary(context, s, settings)) { onOpen(s) }
                 }
             }
         }
@@ -226,31 +240,37 @@ private fun NavRow(title: String, summary: String, onClick: () -> Unit) {
 }
 
 /** Resumen del valor actual que se ve bajo cada categoría. */
-private fun sectionSummary(s: SettingsSection, settings: AppSettings): String {
+private fun sectionSummary(context: android.content.Context, s: SettingsSection, settings: AppSettings): String {
     val app = BloqueadorApp.instance
+    fun str(id: Int, vararg args: Any) = context.getString(id, *args)
     return when (s) {
-        SettingsSection.MODE -> "${settings.mode.label} · ${settings.mode.source.label}"
+        SettingsSection.MODE -> str(R.string.mode_title_with_list, settings.mode.label.get(context), settings.mode.source.label.get(context))
         SettingsSection.SECURITY ->
-            if (settings.threatProtection) "Activada · nivel ${settings.threatLevel.label}" else "Desactivada"
+            if (settings.threatProtection) str(R.string.sum_on_level, settings.threatLevel.label.get(context)) else str(R.string.sum_off_f)
         SettingsSection.LAYERS -> {
             val on = ExtraLayers.available(android.os.Build.MANUFACTURER).filter { it.id in settings.layers }
-            if (on.isEmpty()) "Ninguna" else on.joinToString { it.label }
+            if (on.isEmpty()) str(R.string.sum_none) else on.joinToString { it.label.get(context) }
         }
-        SettingsSection.APPS -> strategySummary(settings)
-        SettingsSection.RULES -> "${settings.allowedDomains.size} permitidos · ${settings.blockedDomains.size} bloqueados"
-        SettingsSection.ENCRYPTED_DNS -> settings.encryptedDns?.let { "Activado · ${it.label}" } ?: "Desactivado · DNS de tu red"
-        SettingsSection.LIST_UPDATES -> settings.updateFrequency.label +
-            (app.repository.lastUpdated.takeIf { it > 0 }?.let { " · actualizadas " + relativeTime(it) } ?: "")
-        SettingsSection.HISTORY -> if (settings.historyEnabled) "Activado · ${settings.historyRetention.label}" else "Desactivado"
-        SettingsSection.BATTERY -> "Ahorro de batería y VPN siempre activa"
-        SettingsSection.APP_UPDATES -> "${settings.updateChannel.label} · versión ${BuildConfig.VERSION_NAME}"
+        SettingsSection.APPS -> strategySummary(context, settings)
+        SettingsSection.RULES -> str(R.string.sum_rules, settings.allowedDomains.size, settings.blockedDomains.size)
+        SettingsSection.ENCRYPTED_DNS ->
+            settings.encryptedDns?.let { str(R.string.sum_dns_on, it.label.get(context)) } ?: str(R.string.sum_dns_off)
+        SettingsSection.LIST_UPDATES -> app.repository.lastUpdated.takeIf { it > 0 }
+            ?.let { str(R.string.sum_updated, settings.updateFrequency.label.get(context), relativeTime(context, it)) }
+            ?: settings.updateFrequency.label.get(context)
+        SettingsSection.HISTORY ->
+            if (settings.historyEnabled) str(R.string.sum_history_on, settings.historyRetention.label.get(context)) else str(R.string.sum_off_m)
+        SettingsSection.BATTERY -> str(R.string.sum_battery)
+        SettingsSection.LANGUAGE -> AppLanguage.current(context)?.let(AppLanguage::displayName)
+            ?: str(R.string.sum_language_system, AppLanguage.displayName(java.util.Locale.getDefault().language))
+        SettingsSection.APP_UPDATES -> str(R.string.sum_app_updates, settings.updateChannel.label.get(context), BuildConfig.VERSION_NAME)
         SettingsSection.ERROR_REPORTS -> when (settings.errorReports) {
-            true -> "Activados · anónimos"
-            false -> "Desactivados"
-            null -> "Sin decidir"
+            true -> str(R.string.sum_reports_on)
+            false -> str(R.string.sum_reports_off)
+            null -> str(R.string.sum_reports_undecided)
         }
-        SettingsSection.HELP -> "YouTube, redes sociales, huecos en webs…"
-        SettingsSection.ABOUT -> "Versión, licencia y código fuente"
+        SettingsSection.HELP -> str(R.string.sum_help)
+        SettingsSection.ABOUT -> str(R.string.sum_about)
     }
 }
 
@@ -262,6 +282,7 @@ private fun SectionScreen(
     onChangeStrategy: () -> Unit,
     onEditApps: () -> Unit,
 ) {
+    val context = LocalContext.current
     val app = BloqueadorApp.instance
     val scope = rememberCoroutineScope()
     var applying by remember { mutableStateOf(false) }
@@ -287,10 +308,9 @@ private fun SectionScreen(
                     } catch (e: Exception) {
                         if (revert != null) {
                             revert()
-                            error = "No se pudo descargar la lista. Comprueba la conexión y vuelve a intentarlo: " +
-                                "se ha dejado como estaba."
+                            error = context.getString(R.string.set_list_failed_reverted)
                         } else {
-                            error = "No se pudo descargar: ${e.message}"
+                            error = context.getString(R.string.set_download_failed, e.message ?: "")
                         }
                     }
                 }
@@ -305,10 +325,10 @@ private fun SectionScreen(
         Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        ScreenHeader(section.title, onBack)
+        ScreenHeader(stringResource(section.title), onBack)
         if (applying) {
             Column {
-                Text("Aplicando cambios…", style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(R.string.set_applying), style = MaterialTheme.typography.bodySmall)
                 LinearProgressIndicator(Modifier.fillMaxWidth())
             }
         }
@@ -324,6 +344,7 @@ private fun SectionScreen(
             SettingsSection.LIST_UPDATES -> ListUpdatesSection()
             SettingsSection.HISTORY -> HistorySection()
             SettingsSection.BATTERY -> BatterySection()
+            SettingsSection.LANGUAGE -> LanguageSection()
             SettingsSection.APP_UPDATES -> AppUpdateSection()
             SettingsSection.ERROR_REPORTS -> ErrorReportsSection()
             SettingsSection.HELP -> HelpSection()
@@ -336,12 +357,16 @@ private fun SectionScreen(
 private fun ModeSection(onChanged: (revert: () -> Unit) -> Unit) {
     val settings = BloqueadorApp.instance.settings
     var mode by remember { mutableStateOf(settings.mode) }
-    SectionCard("¿Cuánto quieres bloquear?") {
+    SectionCard(stringResource(R.string.mode_question)) {
         BlockMode.entries.forEach { m ->
             RadioRow(
                 selected = m == mode,
-                title = m.label + (if (m == BlockMode.BALANCED) " (recomendado)" else "") + " · ${m.source.label}",
-                description = m.description,
+                title = stringResource(
+                    R.string.mode_title_with_list,
+                    if (m == BlockMode.BALANCED) stringResource(R.string.common_recommended, m.label.get()) else m.label.get(),
+                    m.source.label.get(),
+                ),
+                description = m.description.get(),
                 onClick = {
                     if (m != mode) {
                         val previous = mode
@@ -367,16 +392,14 @@ private fun SecuritySection(onChanged: (revert: () -> Unit) -> Unit) {
     var alerts by remember { mutableStateOf(settings.threatAlerts) }
     val blockedRecently by androidx.compose.runtime.produceState<Int?>(null) { value = app.history.threatsBlocked() }
 
-    SectionCard("Qué hace") {
+    SectionCard(stringResource(R.string.sec_what)) {
         Text(
-            "Bloquea dominios conocidos de phishing (webs que imitan a tu banco, a Correos o a una tienda " +
-                "para robarte datos), malware, estafas, webs falsas y criptominado. Funciona en todas las " +
-                "apps: navegador, correo, mensajería, SMS con enlaces…",
+            stringResource(R.string.sec_what_text),
             style = MaterialTheme.typography.bodyMedium,
         )
         SwitchRow(
-            title = "Protección contra amenazas",
-            description = "Recomendado: déjala activada.",
+            title = stringResource(R.string.sec_security),
+            description = stringResource(R.string.sec_switch_desc),
             checked = enabled,
         ) { on ->
             enabled = on
@@ -392,20 +415,20 @@ private fun SecuritySection(onChanged: (revert: () -> Unit) -> Unit) {
         if (enabled) {
             blockedRecently?.let { n ->
                 Text(
-                    if (n == 0) "No se ha bloqueado ninguna amenaza en las últimas ${settings.historyRetention.label}."
-                    else "Amenazas bloqueadas en las últimas ${settings.historyRetention.label}: $n. Las ves en Historial → Amenazas.",
+                    if (n == 0) stringResource(R.string.sec_none_blocked, settings.historyRetention.label.get())
+                    else stringResource(R.string.sec_blocked_n, settings.historyRetention.label.get(), n),
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
         }
     }
     if (enabled) {
-        SectionCard("Nivel") {
+        SectionCard(stringResource(R.string.sec_level)) {
             ThreatLevel.entries.forEach { l ->
                 RadioRow(
                     selected = l == level,
-                    title = l.label + if (l == ThreatLevel.STANDARD) " (recomendado)" else "",
-                    description = l.description,
+                    title = if (l == ThreatLevel.STANDARD) stringResource(R.string.common_recommended, l.label.get()) else l.label.get(),
+                    description = l.description.get(),
                 ) {
                     if (l != level) {
                         val previous = level
@@ -419,11 +442,10 @@ private fun SecuritySection(onChanged: (revert: () -> Unit) -> Unit) {
                 }
             }
         }
-        SectionCard("Avisos") {
+        SectionCard(stringResource(R.string.sec_alerts)) {
             SwitchRow(
-                title = "Avisar cuando se bloquee un sitio peligroso",
-                description = "Un bloqueo es silencioso: la web simplemente no carga. El aviso te dice qué se " +
-                    "bloqueó y qué app lo pidió. Como mucho un aviso por minuto.",
+                title = stringResource(R.string.sec_alerts_switch),
+                description = stringResource(R.string.sec_alerts_desc),
                 checked = alerts,
             ) { on ->
                 alerts = on
@@ -431,17 +453,13 @@ private fun SecuritySection(onChanged: (revert: () -> Unit) -> Unit) {
             }
         }
     }
-    SectionCard("De dónde salen los datos") {
+    SectionCard(stringResource(R.string.sec_sources)) {
         Text(
-            "Listas públicas \"Threat Intelligence Feeds\" de Hagezi, que reúnen decenas de fuentes de " +
-                "seguridad y se actualizan varias veces al día. La app las descarga directamente de GitHub y " +
-                "las comprueba en el móvil: no envía a nadie las webs que visitas. Las listas de webs falsas y " +
-                "de ventanas emergentes maliciosas ya van incluidas en el nivel de bloqueo Equilibrado.",
+            stringResource(R.string.sec_sources_text),
             style = MaterialTheme.typography.bodySmall,
         )
         Text(
-            "Ninguna lista es perfecta: una web de phishing recién creada puede tardar unas horas en aparecer. " +
-                "Desconfía igualmente de enlaces que te piden datos o pagos con prisa.",
+            stringResource(R.string.sec_sources_limits),
             style = MaterialTheme.typography.bodySmall,
         )
     }
@@ -452,15 +470,14 @@ private fun LayersSection(onChanged: (on: Boolean, revert: () -> Unit) -> Unit) 
     val settings = BloqueadorApp.instance.settings
     var layers by remember { mutableStateOf(settings.layers) }
     Text(
-        "Listas que se suman a la del nivel de bloqueo. Cuantas más actives, más se bloquea y más memoria " +
-            "usa la app.",
+        stringResource(R.string.layers_intro),
         style = MaterialTheme.typography.bodySmall,
     )
-    SectionCard("Listas") {
+    SectionCard(stringResource(R.string.layers_lists)) {
         ExtraLayers.available(android.os.Build.MANUFACTURER).forEach { layer ->
             SwitchRow(
-                title = layer.label + if (layer.id == "vendor") " (recomendado)" else "",
-                description = layer.description,
+                title = if (layer.id == "vendor") stringResource(R.string.common_recommended, layer.label.get()) else layer.label.get(),
+                description = layer.description.get(),
                 checked = layer.id in layers,
             ) { on ->
                 layers = if (on) layers + layer.id else layers - layer.id
@@ -479,13 +496,13 @@ private fun AppsSection(onChangeStrategy: () -> Unit, onEditApps: () -> Unit) {
     val context = LocalContext.current
     val settings = BloqueadorApp.instance.settings
     val scope = rememberCoroutineScope()
-    var summary by remember { mutableStateOf(strategySummary(settings)) }
+    var summary by remember { mutableStateOf(strategySummary(context, settings)) }
     var strategy by remember { mutableStateOf(settings.strategy) }
-    SectionCard("Qué apps pasan por el filtro") {
+    SectionCard(stringResource(R.string.apps_which)) {
         Text(summary)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onChangeStrategy) { Text("Cambiar estrategia") }
-            if (strategy != AppStrategy.ALL) OutlinedButton(onClick = onEditApps) { Text("Editar lista") }
+            Button(onClick = onChangeStrategy) { Text(stringResource(R.string.apps_change_strategy)) }
+            if (strategy != AppStrategy.ALL) OutlinedButton(onClick = onEditApps) { Text(stringResource(R.string.apps_edit_list)) }
         }
         TextButton(onClick = {
             scope.launch {
@@ -494,9 +511,9 @@ private fun AppsSection(onChangeStrategy: () -> Unit, onEditApps: () -> Unit) {
                 val recommended = if (sensitive.isEmpty()) AppStrategy.ALL else AppStrategy.ALL_EXCEPT
                 applyAppSelection(context, recommended, sensitive.takeIf { it.isNotEmpty() })
                 strategy = settings.strategy
-                summary = strategySummary(settings)
+                summary = strategySummary(context, settings)
             }
-        }) { Text("Restaurar recomendado (todas menos banca y pagos)") }
+        }) { Text(stringResource(R.string.apps_restore)) }
     }
 }
 
@@ -506,12 +523,12 @@ private fun RulesSection(onChanged: () -> Unit) {
     var allowed by remember { mutableStateOf(settings.allowedDomains) }
     var blocked by remember { mutableStateOf(settings.blockedDomains) }
     Text(
-        "También puedes permitir o bloquear un dominio desde el historial, tocando una entrada.",
+        stringResource(R.string.rules_intro),
         style = MaterialTheme.typography.bodySmall,
     )
     DomainListCard(
-        title = "Permitir siempre",
-        help = "Dominios que nunca se bloquean, aunque estén en una lista. Incluye sus subdominios.",
+        title = stringResource(R.string.hist_allow_always),
+        help = stringResource(R.string.rules_allow_help),
         domains = allowed,
     ) {
         allowed = it
@@ -519,8 +536,8 @@ private fun RulesSection(onChanged: () -> Unit) {
         onChanged()
     }
     DomainListCard(
-        title = "Bloquear siempre",
-        help = "Dominios que quieres bloquear siempre. Incluye sus subdominios.",
+        title = stringResource(R.string.hist_block_always),
+        help = stringResource(R.string.rules_block_help),
         domains = blocked,
     ) {
         blocked = it
@@ -540,9 +557,9 @@ private fun ListUpdatesSection() {
     var checking by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<String?>(null) }
 
-    SectionCard("Cada cuánto se comprueban") {
+    SectionCard(stringResource(R.string.lu_how_often)) {
         UpdateFrequency.entries.forEach { f ->
-            RadioRow(selected = f == frequency, title = f.label, description = f.description) {
+            RadioRow(selected = f == frequency, title = f.label.get(), description = f.description.get()) {
                 if (f != frequency) {
                     frequency = f
                     settings.updateFrequency = f
@@ -551,17 +568,15 @@ private fun ListUpdatesSection() {
             }
         }
         Text(
-            "Solo se descarga algo si la lista ha cambiado, y nunca con la batería baja.",
+            stringResource(R.string.lu_only_changed),
             style = MaterialTheme.typography.bodySmall,
         )
     }
     var wifiOnly by remember { mutableStateOf(settings.downloadsWifiOnly) }
-    SectionCard("Red") {
+    SectionCard(stringResource(R.string.lu_network)) {
         SwitchRow(
-            title = "Descargar solo con wifi",
-            description = "Las descargas automáticas (listas, versiones nuevas e informes de errores) esperan a una " +
-                "wifi y se hacen solas en cuanto te conectas. Las listas ocupan entre 5 y 40 MB según las que " +
-                "actives. Lo que pidas a mano (\"Actualizar ahora\") se descarga siempre.",
+            title = stringResource(R.string.lu_wifi_only),
+            description = stringResource(R.string.lu_wifi_only_desc),
             checked = wifiOnly,
         ) { on ->
             wifiOnly = on
@@ -569,15 +584,15 @@ private fun ListUpdatesSection() {
             DownloadPolicy.reschedule(context)
         }
     }
-    SectionCard("Estado") {
+    SectionCard(stringResource(R.string.lu_status)) {
         Text(
-            if (repo.lastCheck > 0) "Última comprobación: " + relativeTime(repo.lastCheck)
-            else "Aún no se ha hecho ninguna comprobación automática.",
+            if (repo.lastCheck > 0) stringResource(R.string.lu_last_check, relativeTime(context, repo.lastCheck))
+            else stringResource(R.string.lu_never_checked),
             style = MaterialTheme.typography.bodySmall,
         )
         if (repo.consecutiveFailures > 0) {
             Text(
-                "Fallos seguidos: ${repo.consecutiveFailures}. ${repo.lastError.orEmpty()}",
+                stringResource(R.string.lu_failures, repo.consecutiveFailures, repo.lastError.orEmpty()),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
@@ -585,19 +600,19 @@ private fun ListUpdatesSection() {
         message?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
         OutlinedButton(enabled = !checking, onClick = {
             checking = true
-            message = "Comprobando…"
+            message = context.getString(R.string.lu_checking)
             scope.launch {
                 val result = repo.downloadAll()
                 repo.recordCheck(result)
                 if (result.changed && app.vpnState.value is VpnState.Running) app.reloadEngine()
                 message = when {
-                    !result.ok -> "Error: ${result.errors.joinToString("; ")}"
-                    result.changed -> "Listas actualizadas"
-                    else -> "Las listas ya estaban al día"
+                    !result.ok -> context.getString(R.string.lu_error, result.errors.joinToString("; "))
+                    result.changed -> context.getString(R.string.home_lists_updated)
+                    else -> context.getString(R.string.home_lists_current)
                 }
                 checking = false
             }
-        }) { Text("Comprobar ahora") }
+        }) { Text(stringResource(R.string.lu_check_now)) }
     }
 }
 
@@ -610,10 +625,10 @@ private fun HistorySection() {
     var historyOn by remember { mutableStateOf(settings.historyEnabled) }
     var retention by remember { mutableStateOf(settings.historyRetention) }
 
-    SectionCard("Historial de consultas") {
+    SectionCard(stringResource(R.string.hs_title)) {
         SwitchRow(
-            title = "Guardar historial",
-            description = "Solo en este móvil. Se borra solo pasado el tiempo elegido.",
+            title = stringResource(R.string.idx_history_save),
+            description = stringResource(R.string.hs_save_desc),
             checked = historyOn,
         ) { on ->
             historyOn = on
@@ -621,7 +636,7 @@ private fun HistorySection() {
             if (!on) scope.launch { app.history.clear() }
         }
         if (historyOn) {
-            Text("Conservar durante:", style = MaterialTheme.typography.bodyMedium)
+            Text(stringResource(R.string.hs_keep_for), style = MaterialTheme.typography.bodyMedium)
             // Con desplazamiento horizontal: con letra grande no caben las cuatro opciones.
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -635,7 +650,7 @@ private fun HistorySection() {
                             settings.historyRetention = r
                             scope.launch { app.history.cleanup() }
                         },
-                        label = { Text(r.label) },
+                        label = { Text(r.label.get()) },
                     )
                 }
             }
@@ -643,9 +658,9 @@ private fun HistorySection() {
         OutlinedButton(onClick = {
             scope.launch {
                 app.history.clear()
-                Toast.makeText(context, "Historial borrado", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.hs_cleared), Toast.LENGTH_SHORT).show()
             }
-        }) { Text("Borrar historial ahora") }
+        }) { Text(stringResource(R.string.hs_clear_now)) }
     }
 }
 
@@ -653,33 +668,55 @@ private fun HistorySection() {
 private fun EncryptedDnsSection() {
     val settings = BloqueadorApp.instance.settings
     var selected by remember { mutableStateOf(settings.encryptedDns) }
-    SectionCard("DNS cifrado") {
+    SectionCard(stringResource(R.string.sec_encrypted_dns)) {
         Text(
-            "Normalmente, las consultas que Garbillo deja pasar van sin cifrar al DNS de tu red (el de tu " +
-                "operador o tu router), que puede verlas. Con el DNS cifrado van por TLS a un servicio de " +
-                "confianza: nadie en la red ve ni cambia qué webs visitas.",
+            stringResource(R.string.dns_intro),
             style = MaterialTheme.typography.bodyMedium,
         )
         RadioRow(
             selected = selected == null,
-            title = "Desactivado (DNS de tu red)",
-            description = "Lo de siempre. Funciona en cualquier red.",
+            title = stringResource(R.string.dns_off),
+            description = stringResource(R.string.dns_off_desc),
             onClick = { selected = null; settings.encryptedDns = null },
         )
         app.bloqueador.vpn.DotProvider.entries.forEach { p ->
             RadioRow(
                 selected = selected == p,
-                title = p.label,
-                description = p.description,
+                title = p.label.get(),
+                description = p.description.get(),
                 onClick = { selected = p; settings.encryptedDns = p },
             )
         }
         Text(
-            "En una wifi con página de acceso (hoteles, aeropuertos) se usa el DNS de la red hasta que " +
-                "inicias sesión. Si una red bloquea el DNS cifrado, Garbillo avisará de que el DNS no " +
-                "responde: elige otro servicio o desactívalo en esa red.",
+            stringResource(R.string.dns_note),
             style = MaterialTheme.typography.bodySmall,
         )
+    }
+}
+
+/** Idioma de la app: el del móvil (por defecto) o uno de los disponibles (carpetas res/values-xx). */
+@Composable
+private fun LanguageSection() {
+    val context = LocalContext.current
+    var selected by remember { mutableStateOf(AppLanguage.current(context)) }
+    fun choose(tag: String?) {
+        if (tag == selected) return
+        selected = tag
+        AppLanguage.set(context, tag)
+        // Android 13+ vuelve a crear la pantalla él solo; en 8 a 12 hay que hacerlo a mano.
+        if (android.os.Build.VERSION.SDK_INT < 33) (context as? android.app.Activity)?.recreate()
+    }
+    SectionCard(stringResource(R.string.sec_language)) {
+        Text(stringResource(R.string.lang_intro), style = MaterialTheme.typography.bodySmall)
+        RadioRow(
+            selected = selected == null,
+            title = stringResource(R.string.lang_system),
+            description = "",
+            onClick = { choose(null) },
+        )
+        AppLanguage.available().forEach { (tag, name) ->
+            RadioRow(selected = selected == tag, title = name, description = "", onClick = { choose(tag) })
+        }
     }
 }
 
@@ -687,57 +724,46 @@ private fun EncryptedDnsSection() {
 private fun BatterySection() {
     val context = LocalContext.current
     val optimized = remember { BatteryGuide.isOptimized(context) }
-    SectionCard("Que Android no cierre el filtro") {
+    SectionCard(stringResource(R.string.battery_card_title)) {
         Text(
-            if (optimized) {
-                "Ahora mismo Android puede cerrar Garbillo para ahorrar batería. Garbillo apenas gasta " +
-                    "(está dormido hasta que llega una consulta), así que es seguro excluirlo: busca " +
-                    "Garbillo y elige \"No optimizar\" o \"Sin restricciones\"."
-            } else {
-                "Garbillo ya está excluido del ahorro de batería. El filtro seguirá activo aunque no uses el móvil."
-            },
+            stringResource(if (optimized) R.string.bat_optimized else R.string.bat_excluded),
             style = MaterialTheme.typography.bodyMedium,
         )
-        BatteryGuide.manufacturerSteps()?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-        OutlinedButton(onClick = { BatteryGuide.openSettings(context) }) { Text("Abrir ajustes de batería") }
+        BatteryGuide.manufacturerSteps(context)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+        OutlinedButton(onClick = { BatteryGuide.openSettings(context) }) { Text(stringResource(R.string.bat_open)) }
     }
     val alwaysOn = BloqueadorApp.instance.settings.alwaysOnVpn
-    SectionCard("Al encender el móvil") {
+    SectionCard(stringResource(R.string.idx_boot)) {
         Text(
-            "Si dejas el filtro activado, Garbillo se vuelve a activar solo al encender el móvil " +
-                "(tras el primer desbloqueo) y después de actualizarse. Si aun así lo encuentras apagado, " +
-                "se activa de nuevo al abrir la app.",
+            stringResource(R.string.bat_boot_text),
             style = MaterialTheme.typography.bodyMedium,
         )
-        BatteryGuide.autostartSteps()?.let { steps ->
+        BatteryGuide.autostartSteps(context)?.let { steps ->
             Text(
-                "En este móvil hace falta además el permiso de \"Inicio automático\": $steps",
+                stringResource(R.string.bat_autostart_needed, steps),
                 style = MaterialTheme.typography.bodySmall,
             )
-            OutlinedButton(onClick = { BatteryGuide.openAutostart(context) }) { Text("Abrir inicio automático") }
+            OutlinedButton(onClick = { BatteryGuide.openAutostart(context) }) { Text(stringResource(R.string.bat_open_autostart)) }
         }
     }
-    SectionCard("VPN siempre activa (recomendado)") {
+    SectionCard(stringResource(R.string.bat_always_on_title)) {
         Text(
             when (alwaysOn) {
-                true -> "Activada: Android arranca el filtro en cuanto se enciende el móvil y lo vuelve a abrir si se cierra."
-                false -> "Sin activar. Con ella, Android arranca el filtro en cuanto se enciende el móvil y lo vuelve a " +
-                    "abrir si algo lo cierra."
-                null -> "Con ella, Android arranca el filtro en cuanto se enciende el móvil y lo vuelve a abrir si algo lo cierra."
+                true -> stringResource(R.string.bat_always_on_yes)
+                false -> stringResource(R.string.bat_always_on_no)
+                null -> stringResource(R.string.bat_always_on_unknown)
             },
             style = MaterialTheme.typography.bodyMedium,
         )
         Text(
-            "En Ajustes de Android → Red → VPN, toca el engranaje junto a Garbillo y activa \"VPN siempre activa\". " +
-                "No actives \"Bloquear conexiones sin VPN\": Garbillo solo lleva el DNS, así que con esa opción " +
-                "Android corta todo internet en el móvil.",
+            stringResource(R.string.bat_always_on_how),
             style = MaterialTheme.typography.bodySmall,
         )
         OutlinedButton(onClick = {
             runCatching {
                 context.startActivity(android.content.Intent(android.provider.Settings.ACTION_VPN_SETTINGS))
             }
-        }) { Text("Abrir ajustes de VPN") }
+        }) { Text(stringResource(R.string.home_open_vpn_settings)) }
     }
     // Perfil de trabajo, Espacio privado (Android 15) o "Carpeta segura": cada perfil tiene sus propias
     // VPN, así que sus apps no pasan por Garbillo.
@@ -745,17 +771,16 @@ private fun BatterySection() {
         runCatching { context.getSystemService(android.os.UserManager::class.java).userProfiles.size - 1 }.getOrDefault(0)
     }
     if (otherProfiles > 0) {
-        SectionCard("Otros perfiles del móvil") {
+        SectionCard(stringResource(R.string.bat_profiles_title)) {
             Text(
-                "Este móvil tiene un perfil de trabajo, un Espacio privado o una carpeta segura. Android da a " +
-                    "cada perfil su propia VPN, así que Garbillo no filtra las apps de ese perfil, solo las de este.",
+                stringResource(R.string.bat_profiles_text),
                 style = MaterialTheme.typography.bodySmall,
             )
         }
     }
-    SectionCard("Consumo medido") {
+    SectionCard(stringResource(R.string.bat_measured_title)) {
         Text(
-            "En pruebas de 24 horas el filtro gastó entre el 0,1 % y el 0,4 % de la batería al día.",
+            stringResource(R.string.bat_measured_text),
             style = MaterialTheme.typography.bodySmall,
         )
     }
@@ -763,14 +788,12 @@ private fun BatterySection() {
 
 @Composable
 private fun HelpSection() {
-    SectionCard("Lo que no puede quitar") {
-        Text(LIMITS_TEXT, style = MaterialTheme.typography.bodyMedium)
+    SectionCard(stringResource(R.string.onb_limits_title)) {
+        Text(stringResource(R.string.limits_text), style = MaterialTheme.typography.bodyMedium)
     }
-    SectionCard("Donde mejor funciona") {
+    SectionCard(stringResource(R.string.help_best)) {
         Text(
-            "Juegos y apps gratuitas, publicidad del propio sistema del móvil y rastreadores en todas las " +
-                "apps. Para ver qué se ha bloqueado y decidir si te interesaba, usa el historial: \"Ver en la web\" " +
-                "te enseña lo que ese dominio pone en la página.",
+            stringResource(R.string.help_best_text),
             style = MaterialTheme.typography.bodyMedium,
         )
     }
@@ -780,23 +803,22 @@ private fun HelpSection() {
 private fun AboutSection() {
     val uri = LocalUriHandler.current
     SectionCard("Garbillo") {
-        Text("Versión ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+        Text(stringResource(R.string.about_version, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE))
         Text(
-            "Garbillo es un bloqueador de publicidad y rastreadores para todo el móvil, sin root. Funciona dentro del " +
-                "móvil: tu navegación no se envía a ningún servidor y no recoge estadísticas. Solo sale del " +
-                "móvil lo que tú decidas reportar.",
+            stringResource(R.string.about_text),
             style = MaterialTheme.typography.bodySmall,
         )
-        Text("Software libre, licencia GPLv3. Listas de bloqueo de Hagezi y otros autores.", style = MaterialTheme.typography.bodySmall)
-        OutlinedButton(onClick = { uri.openUri(WEB_URL) }) { Text("Web de Garbillo") }
-        OutlinedButton(onClick = { uri.openUri("${WEB_URL}privacidad/") }) { Text("Política de privacidad") }
+        Text(stringResource(R.string.about_license), style = MaterialTheme.typography.bodySmall)
+        val web = stringResource(R.string.url_web)
+        val privacy = stringResource(R.string.url_privacy)
+        OutlinedButton(onClick = { uri.openUri(web) }) { Text(stringResource(R.string.about_web)) }
+        OutlinedButton(onClick = { uri.openUri(privacy) }) { Text(stringResource(R.string.about_privacy)) }
         OutlinedButton(onClick = { uri.openUri("https://github.com/${BuildConfig.UPDATE_REPO}") }) {
-            Text("Código fuente en GitHub")
+            Text(stringResource(R.string.about_source))
         }
     }
 }
 
-private const val WEB_URL = "https://flowmaticc.github.io/utilities/bloqueador-android/"
 
 /** Fila con título, descripción e interruptor; toda la fila cambia el interruptor. */
 @Composable
@@ -832,7 +854,7 @@ private fun DomainListCard(
                     input = it
                     invalid = false
                 },
-                label = { Text("ejemplo.com") },
+                label = { Text(stringResource(R.string.domain_hint)) },
                 singleLine = true,
                 isError = invalid,
                 modifier = Modifier.weight(1f),
@@ -845,14 +867,14 @@ private fun DomainListCard(
                     input = ""
                     if (domain !in domains) onChange(domains + domain)
                 }
-            }) { Text("Añadir") }
+            }) { Text(stringResource(R.string.domain_add)) }
         }
-        if (invalid) Text("No es un dominio válido.", color = MaterialTheme.colorScheme.error)
-        if (domains.isEmpty()) Text("Ninguno todavía.", style = MaterialTheme.typography.bodySmall)
+        if (invalid) Text(stringResource(R.string.domain_invalid), color = MaterialTheme.colorScheme.error)
+        if (domains.isEmpty()) Text(stringResource(R.string.domain_none), style = MaterialTheme.typography.bodySmall)
         domains.sorted().forEach { domain ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(domain, Modifier.weight(1f))
-                TextButton(onClick = { onChange(domains - domain) }) { Text("Quitar") }
+                TextButton(onClick = { onChange(domains - domain) }) { Text(stringResource(R.string.domain_remove)) }
             }
         }
     }

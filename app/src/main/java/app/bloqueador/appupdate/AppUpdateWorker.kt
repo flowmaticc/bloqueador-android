@@ -76,23 +76,23 @@ class AppUpdateWorker(context: Context, params: WorkerParameters) : CoroutineWor
             ) return
             val nm = context.getSystemService(NotificationManager::class.java)
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "Actualizaciones de la app", NotificationManager.IMPORTANCE_LOW)
+                NotificationChannel(CHANNEL_ID, context.getString(R.string.notif_ch_app_updates), NotificationManager.IMPORTANCE_LOW)
             )
             // Las de seguridad van por un canal que sí suena (el usuario puede silenciarlo aparte).
             nm.createNotificationChannel(
-                NotificationChannel(URGENT_CHANNEL_ID, "Actualizaciones de seguridad", NotificationManager.IMPORTANCE_DEFAULT)
+                NotificationChannel(URGENT_CHANNEL_ID, context.getString(R.string.notif_ch_security_updates), NotificationManager.IMPORTANCE_DEFAULT)
             )
             val open = Intent(context, MainActivity::class.java).putExtra(EXTRA_OPEN_UPDATES, true)
             val text = when {
-                urgent -> "Corrige un fallo de seguridad de tu versión. Toca para instalarla."
+                urgent -> context.getString(R.string.notif_upd_urgent_text)
                 info.notice != null -> info.notice
-                else -> "Toca para ver los cambios e instalarla."
+                else -> context.getString(R.string.notif_upd_text)
             }
             val notification = NotificationCompat.Builder(context, if (urgent) URGENT_CHANNEL_ID else CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_stat_garbillo)
                 .setContentTitle(
-                    if (urgent) "Actualización importante de Garbillo: ${info.versionName}"
-                    else "Nueva versión de Garbillo: ${info.versionName}"
+                    if (urgent) context.getString(R.string.notif_upd_urgent_title, info.versionName)
+                    else context.getString(R.string.notif_upd_title, info.versionName)
                 )
                 .setContentText(text)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(text))

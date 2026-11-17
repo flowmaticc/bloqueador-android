@@ -48,12 +48,12 @@ class BootReceiver : BroadcastReceiver() {
             PackageManager.PERMISSION_GRANTED
         ) return
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "Avisos del filtro", NotificationManager.IMPORTANCE_DEFAULT)
+            NotificationChannel(CHANNEL_ID, context.getString(R.string.notif_ch_filter_alerts), NotificationManager.IMPORTANCE_DEFAULT)
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_garbillo)
-            .setContentTitle("El filtro está desactivado")
-            .setContentText("Android no dejó activarlo al encender el móvil. Toca para activarlo.")
+            .setContentTitle(context.getString(R.string.notif_boot_title))
+            .setContentText(context.getString(R.string.notif_boot_text))
             .setAutoCancel(true)
             .setContentIntent(
                 PendingIntent.getActivity(

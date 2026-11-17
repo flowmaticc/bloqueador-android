@@ -1,5 +1,7 @@
 package app.bloqueador.ui
 
+import app.bloqueador.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -87,23 +89,22 @@ fun AppPickerScreen(
             .safeDrawingPadding()
             .padding(horizontal = 16.dp),
     ) {
-        ScreenHeader(if (excluding) "Apps que NO se filtran" else "Apps que se filtran", onBack)
+        ScreenHeader(stringResource(if (excluding) R.string.picker_excluded_title else R.string.picker_included_title), onBack)
         Text(
-            if (excluding) "Marca las apps que quieres dejar fuera del filtro. El resto se filtra."
-            else "Marca las apps que quieres filtrar. El resto no se toca.",
+            stringResource(if (excluding) R.string.picker_excluded_text else R.string.picker_included_text),
             style = MaterialTheme.typography.bodyMedium,
         )
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
-            label = { Text("Buscar app") },
+            label = { Text(stringResource(R.string.picker_search)) },
             singleLine = true,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 8.dp),
         )
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
-            Text("Mostrar apps del sistema", Modifier.weight(1f))
+            Text(stringResource(R.string.picker_system), Modifier.weight(1f))
             Switch(checked = showSystem, onCheckedChange = { showSystem = it })
         }
 
@@ -125,9 +126,8 @@ fun AppPickerScreen(
                 if (sensitive.isNotEmpty()) {
                     item(key = "h-sensitive") {
                         SectionLabel(
-                            "Banca y pagos",
-                            if (excluding) "Recomendado excluirlas: algunas no funcionan con una VPN activa."
-                            else "No se recomienda filtrarlas: algunas no funcionan con una VPN activa.",
+                            stringResource(R.string.picker_banking),
+                            stringResource(if (excluding) R.string.picker_banking_exclude else R.string.picker_banking_include),
                         )
                     }
                     items(sensitive, key = { it.packageName }) { app ->
@@ -135,20 +135,20 @@ fun AppPickerScreen(
                     }
                 }
                 if (others.isNotEmpty()) {
-                    item(key = "h-others") { SectionLabel("Otras apps", null) }
+                    item(key = "h-others") { SectionLabel(stringResource(R.string.picker_others), null) }
                     items(others, key = { it.packageName }) { app ->
                         AppRow(app, app.packageName in selected) { toggle(app.packageName) }
                     }
                 }
                 if (visible.isEmpty()) {
-                    item { Text("No hay apps que coincidan.", Modifier.padding(16.dp)) }
+                    item { Text(stringResource(R.string.picker_no_match), Modifier.padding(16.dp)) }
                 }
             }
         }
 
         val canSave = excluding || selected.isNotEmpty()
         if (!canSave) {
-            Text("Marca al menos una app.", style = MaterialTheme.typography.bodySmall)
+            Text(stringResource(R.string.picker_select_one), style = MaterialTheme.typography.bodySmall)
         }
         Button(
             enabled = canSave && apps != null,
@@ -156,7 +156,7 @@ fun AppPickerScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp),
-        ) { Text("Guardar (${selected.size} marcadas)") }
+        ) { Text(stringResource(R.string.picker_save, selected.size)) }
     }
 }
 

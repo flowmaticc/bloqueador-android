@@ -141,18 +141,13 @@ object UpdateNotifier {
         ) return
 
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "Actualización de listas", NotificationManager.IMPORTANCE_LOW)
+            NotificationChannel(CHANNEL_ID, context.getString(R.string.notif_ch_list_updates), NotificationManager.IMPORTANCE_LOW)
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_garbillo)
-            .setContentTitle("No se pudieron actualizar las listas")
-            .setContentText("El filtro sigue funcionando con las listas que ya tienes.")
-            .setStyle(
-                NotificationCompat.BigTextStyle().bigText(
-                    "El filtro sigue funcionando con las listas que ya tienes. " +
-                        "Se volverá a intentar automáticamente; también puedes pulsar \"Actualizar ahora\"."
-                )
-            )
+            .setContentTitle(context.getString(R.string.notif_lists_failed_title))
+            .setContentText(context.getString(R.string.notif_lists_failed_text))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(context.getString(R.string.notif_lists_failed_long)))
             .setAutoCancel(true)
             .setContentIntent(
                 PendingIntent.getActivity(

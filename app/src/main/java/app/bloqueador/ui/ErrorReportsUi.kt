@@ -1,5 +1,7 @@
 package app.bloqueador.ui
 
+import app.bloqueador.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,16 +28,6 @@ import app.bloqueador.diag.ErrorReportWorker
 import app.bloqueador.diag.ErrorReports
 
 /** Qué se envía y qué no, dicho igual en la bienvenida, en Ajustes y en la tarjeta de inicio. */
-internal const val ERROR_REPORTS_WHAT =
-    "Si algo falla (la app se cierra, una lista no se descarga, una actualización no se instala…), Garbillo " +
-        "puede enviar un aviso anónimo para que lo arreglemos. Lleva el tipo de fallo, el sitio del código " +
-        "donde ocurrió, la versión de Garbillo y de Android, la marca del móvil y el nivel de bloqueo."
-
-internal const val ERROR_REPORTS_NOT =
-    "Nunca lleva webs, historial, tus apps, tu red, ningún identificador del móvil ni el texto de los " +
-        "errores. No se guarda la IP. Se envía como mucho una vez al día y, si eliges \"solo con wifi\", " +
-        "solo con wifi. Puedes ver el informe exacto antes de que salga y desactivarlo cuando quieras."
-
 /** Guarda la elección del usuario y programa (o cancela) el envío diario. */
 internal fun chooseErrorReports(context: android.content.Context, on: Boolean) {
     BloqueadorApp.instance.settings.errorReports = on
@@ -49,12 +41,12 @@ fun ErrorReportsQuestionCard() {
     val context = LocalContext.current
     var asked by remember { mutableStateOf(BloqueadorApp.instance.settings.errorReports != null) }
     if (asked) return
-    SectionCard("¿Ayudas a mejorar Garbillo?") {
-        Text(ERROR_REPORTS_WHAT, style = MaterialTheme.typography.bodyMedium)
-        Text(ERROR_REPORTS_NOT, style = MaterialTheme.typography.bodySmall)
+    SectionCard(stringResource(R.string.onb_help_title)) {
+        Text(stringResource(R.string.error_reports_what), style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.error_reports_not), style = MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { chooseErrorReports(context, true); asked = true }) { Text("Sí, ayudar") }
-            TextButton(onClick = { chooseErrorReports(context, false); asked = true }) { Text("No, gracias") }
+            Button(onClick = { chooseErrorReports(context, true); asked = true }) { Text(stringResource(R.string.reports_yes_help)) }
+            TextButton(onClick = { chooseErrorReports(context, false); asked = true }) { Text(stringResource(R.string.onb_reports_no)) }
         }
     }
 }
@@ -66,36 +58,36 @@ internal fun ErrorReportsSection() {
     var on by remember { mutableStateOf(BloqueadorApp.instance.settings.errorReports == true) }
     var preview by remember { mutableStateOf<String?>(null) }
 
-    SectionCard("Informes de errores anónimos") {
-        Text(ERROR_REPORTS_WHAT, style = MaterialTheme.typography.bodyMedium)
-        Text(ERROR_REPORTS_NOT, style = MaterialTheme.typography.bodySmall)
+    SectionCard(stringResource(R.string.reports_section_title)) {
+        Text(stringResource(R.string.error_reports_what), style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.error_reports_not), style = MaterialTheme.typography.bodySmall)
         SwitchRow(
-            title = "Enviar informes de errores",
-            description = if (on) "Activado. Gracias." else "Desactivado: no se anota ni se envía nada.",
+            title = stringResource(R.string.reports_switch),
+            description = stringResource(if (on) R.string.reports_on else R.string.reports_off),
             checked = on,
         ) { v ->
             on = v
             chooseErrorReports(context, v)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { preview = ErrorReports.preview(context) }) { Text("Ver qué se enviaría") }
+            OutlinedButton(onClick = { preview = ErrorReports.preview(context) }) { Text(stringResource(R.string.reports_preview)) }
             TextButton(onClick = {
                 ErrorReports.clear(context)
                 preview = ErrorReports.preview(context)
-            }) { Text("Borrar lo pendiente") }
+            }) { Text(stringResource(R.string.reports_clear)) }
         }
     }
 
     preview?.let { text ->
         AlertDialog(
             onDismissRequest = { preview = null },
-            title = { Text("Próximo informe") },
+            title = { Text(stringResource(R.string.reports_next)) },
             text = {
                 Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
                     Text(text, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
                 }
             },
-            confirmButton = { TextButton(onClick = { preview = null }) { Text("Cerrar") } },
+            confirmButton = { TextButton(onClick = { preview = null }) { Text(stringResource(R.string.common_close)) } },
         )
     }
 }

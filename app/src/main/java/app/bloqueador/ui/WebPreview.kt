@@ -1,5 +1,7 @@
 package app.bloqueador.ui
 
+import app.bloqueador.R
+import androidx.compose.ui.res.stringResource
 import app.bloqueador.settings.AppSettings
 import android.annotation.SuppressLint
 import android.content.Intent
@@ -85,7 +87,7 @@ fun WebPreviewDialog(event: HistoryEvent, onDismiss: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TextButton(onClick = { if (url != null) url = null else onDismiss() }) {
-                        Text(if (url != null) "‹ Otra web" else "‹ Cerrar")
+                        Text(if (url != null) stringResource(R.string.web_other_site) else "‹ " + stringResource(R.string.common_close))
                     }
                     Text(
                         event.domain,
@@ -119,29 +121,24 @@ private fun SitePicker(event: HistoryEvent, onPick: (String) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Text(
-            "¿En qué web apareció?",
+            stringResource(R.string.web_where_title),
             style = MaterialTheme.typography.titleMedium,
         )
         Text(
-            "Garbillo solo ve el nombre del dominio, no la página. Estas son las webs que " +
-                "${appLabel(context, event.appPackage)} abrió en esos momentos. Se cargará la que elijas " +
-                "dejando pasar solo ${event.domain}, y lo que cargue se rodeará en rojo.",
+            stringResource(R.string.web_where_text, appLabel(context, event.appPackage), event.domain),
             style = MaterialTheme.typography.bodySmall,
         )
         if (isBrowser == false) {
             Text(
-                "${appLabel(context, event.appPackage)} no es un navegador: los anuncios dentro de una app " +
-                    "los dibuja la propia app y no se pueden reproducir aquí. Puedes probar igualmente con " +
-                    "la web del servicio.",
+                stringResource(R.string.web_not_browser, appLabel(context, event.appPackage)),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
         }
         when {
-            candidates == null -> Text("Buscando…")
+            candidates == null -> Text(stringResource(R.string.hist_searching))
             candidates!!.isEmpty() -> Text(
-                "No hay webs cercanas en el historial (Android pudo reutilizar respuestas guardadas). " +
-                    "Escribe la dirección de la web donde lo viste.",
+                stringResource(R.string.web_no_candidates),
                 style = MaterialTheme.typography.bodyMedium,
             )
             else -> candidates!!.forEach { host ->
@@ -153,18 +150,17 @@ private fun SitePicker(event: HistoryEvent, onPick: (String) -> Unit) {
         OutlinedTextField(
             value = typed,
             onValueChange = { typed = it },
-            label = { Text("Otra dirección (p. ej. marca.com)") },
+            label = { Text(stringResource(R.string.web_other_address)) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
             keyboardActions = KeyboardActions(onGo = { normalizeUrl(typed)?.let(onPick) }),
             modifier = Modifier.fillMaxWidth(),
         )
         Button(enabled = normalizeUrl(typed) != null, onClick = { normalizeUrl(typed)?.let(onPick) }) {
-            Text("Abrir")
+            Text(stringResource(R.string.web_open))
         }
         Text(
-            "La vista previa no usa tu sesión del navegador ni sus cookies, y lo borra todo al cerrar. " +
-                "Gasta datos como abrir la web normalmente.",
+            stringResource(R.string.web_privacy),
             style = MaterialTheme.typography.bodySmall,
         )
     }
@@ -256,30 +252,27 @@ private fun PreviewPage(event: HistoryEvent, url: String, onDismiss: () -> Unit)
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Text(
-                "En rojo: lo que carga ${event.domain}",
+                stringResource(R.string.web_in_red, event.domain),
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.error,
             )
             Text(
-                "$requests peticiones a este dominio · $visible elementos visibles" +
-                    if (!allowAll && otherBlocked > 0) " · $otherBlocked bloqueadas de otros dominios" else "",
+                if (!allowAll && otherBlocked > 0) stringResource(R.string.web_counts_blocked, requests, visible, otherBlocked)
+                else stringResource(R.string.web_counts, requests, visible),
                 style = MaterialTheme.typography.bodySmall,
             )
+            val consent = stringResource(R.string.web_consent_hint)
             val hint = when {
-                !loaded -> "Cargando…"
-                requests == 0 && !allowAll ->
-                    "Esta web no ha pedido ${event.domain} ahora. A veces un anuncio depende de otros " +
-                        "dominios bloqueados: activa \"Cargar también lo demás\". $CONSENT_HINT"
-                requests == 0 ->
-                    "Esta web no ha pedido ${event.domain} ahora. $CONSENT_HINT Si no, prueba con otra " +
-                        "página de la web (un artículo en vez de la portada) o más tarde."
-                visible == 0 -> "Ha cargado cosas, pero nada visible: suele ser estadística o rastreo."
-                else -> "Desplázate por la página para ver todos los recuadros rojos."
+                !loaded -> stringResource(R.string.web_loading)
+                requests == 0 && !allowAll -> stringResource(R.string.web_not_requested_more, event.domain, consent)
+                requests == 0 -> stringResource(R.string.web_not_requested, event.domain, consent)
+                visible == 0 -> stringResource(R.string.web_nothing_visible)
+                else -> stringResource(R.string.web_scroll)
             }
             Text(hint, style = MaterialTheme.typography.bodySmall)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "Cargar también lo demás bloqueado",
+                    stringResource(R.string.web_load_rest),
                     style = MaterialTheme.typography.bodySmall,
                     modifier = Modifier.weight(1f),
                 )
@@ -287,7 +280,7 @@ private fun PreviewPage(event: HistoryEvent, url: String, onDismiss: () -> Unit)
             }
             if (requests > 0) {
                 TextButton(onClick = { showUrls = !showUrls }) {
-                    Text(if (showUrls) "Ocultar peticiones" else "Ver peticiones")
+                    Text(stringResource(if (showUrls) R.string.web_hide_requests else R.string.web_show_requests))
                 }
                 if (showUrls) {
                     client.targetUrls.toList().take(30).forEach {
@@ -299,23 +292,20 @@ private fun PreviewPage(event: HistoryEvent, url: String, onDismiss: () -> Unit)
                 val allowed = settings.allowedDomains.contains(event.domain)
                 if (event.blocked && !allowed) {
                     Button(onClick = {
-                        apply("${event.domain} permitido") { settings.allowedDomains = settings.allowedDomains + listOfNotNull(AppSettings.cleanDomain(event.domain)) }
-                    }) { Text("Permitir siempre") }
-                    OutlinedButton(onClick = onDismiss) { Text("Mantener bloqueado") }
+                        apply(context.getString(R.string.hist_allowed_toast, event.domain)) { settings.allowedDomains = settings.allowedDomains + listOfNotNull(AppSettings.cleanDomain(event.domain)) }
+                    }) { Text(stringResource(R.string.hist_allow_always)) }
+                    OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.web_keep_blocked)) }
                 } else if (!event.blocked) {
                     Button(onClick = {
-                        apply("${event.domain} bloqueado") { settings.blockedDomains = settings.blockedDomains + listOfNotNull(AppSettings.cleanDomain(event.domain)) }
-                    }) { Text("Bloquear siempre") }
-                    OutlinedButton(onClick = onDismiss) { Text("Dejarlo así") }
+                        apply(context.getString(R.string.hist_blocked_toast, event.domain)) { settings.blockedDomains = settings.blockedDomains + listOfNotNull(AppSettings.cleanDomain(event.domain)) }
+                    }) { Text(stringResource(R.string.hist_block_always)) }
+                    OutlinedButton(onClick = onDismiss) { Text(stringResource(R.string.web_leave_it)) }
                 }
             }
         }
     }
 }
 
-/** Las webs europeas no cargan anuncios hasta aceptar cookies; en la vista previa se borran al cerrar. */
-private const val CONSENT_HINT =
-    "Muchas webs no cargan anuncios hasta que aceptas sus cookies: puedes aceptarlas aquí, se borran al cerrar."
 
 /**
  * Decide qué carga la vista previa. El dominio elegido siempre pasa; lo demás que el filtro

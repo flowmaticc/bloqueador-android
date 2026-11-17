@@ -53,9 +53,9 @@ class TurtlecuteCoverageTest {
         report.appendLine("|---|---|" + sections.joinToString("|") { "---" } + "|")
         val combos = BlockMode.entries.flatMap { mode ->
             listOf(
-                mode.label to listOf(mode.source),
-                "${mode.label} + Anti-evasión DNS" to listOf(mode.source, ExtraLayers.all.first { it.id == "doh" }),
-                "${mode.label} + todas las capas" to listOf(mode.source) + ExtraLayers.all,
+                mode.name to listOf(mode.source),
+                "${mode.name} + Anti-evasión DNS" to listOf(mode.source, ExtraLayers.all.first { it.id == "doh" }),
+                "${mode.name} + todas las capas" to listOf(mode.source) + ExtraLayers.all,
             )
         }
         for ((name, sources) in combos) {
@@ -67,13 +67,13 @@ class TurtlecuteCoverageTest {
 
         // 2) Capas sueltas, para ver qué aporta cada una.
         report.appendLine("\n## Cada lista por separado\n")
-        for ((src, m) in lists) report.appendLine("- ${src.label}: ${pct(domains.count { m.isBlocked(it.domain) }, domains.size)}")
+        for ((src, m) in lists) report.appendLine("- ${src.id}: ${pct(domains.count { m.isBlocked(it.domain) }, domains.size)}")
 
         // 3) Lo que se escapa al modo recomendado (Equilibrado) y quién lo cubriría.
         report.appendLine("\n## Dominios que no bloquea el modo Equilibrado\n")
         val balanced = lists.getValue(BlockMode.BALANCED.source)
         for (d in domains.filter { !balanced.isBlocked(it.domain) }) {
-            val who = lists.filter { (_, m) -> m.isBlocked(d.domain) }.keys.joinToString { it.label }
+            val who = lists.filter { (_, m) -> m.isBlocked(d.domain) }.keys.joinToString { it.id }
             report.appendLine("- ${d.section} / ${d.vendor}: `${d.domain}`" + if (who.isEmpty()) " — ninguna lista" else " — sí en: $who")
         }
 

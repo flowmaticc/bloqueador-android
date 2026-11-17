@@ -34,19 +34,18 @@ class ThreatAlerts(private val context: Context) {
 
         val nm = context.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "Sitios peligrosos bloqueados", NotificationManager.IMPORTANCE_DEFAULT)
-                .apply { description = "Aviso cuando se bloquea un sitio de phishing, malware o estafas." }
+            NotificationChannel(CHANNEL_ID, context.getString(R.string.notif_ch_threats), NotificationManager.IMPORTANCE_DEFAULT)
+                .apply { description = context.getString(R.string.notif_ch_threats_desc) }
         )
         val app = appLabel(context, appPackage)
         val intent = Intent(context, MainActivity::class.java).putExtra(MainActivity.EXTRA_OPEN_THREATS, true)
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_garbillo)
-            .setContentTitle("Sitio peligroso bloqueado")
-            .setContentText("$domain · $app")
+            .setContentTitle(context.getString(R.string.notif_threat_title))
+            .setContentText(context.getString(R.string.notif_threat_short, domain, app))
             .setStyle(
                 NotificationCompat.BigTextStyle().bigText(
-                    "$domain está en la lista de amenazas (phishing, malware o estafas) y se ha bloqueado. " +
-                        "Lo pidió: $app. Si no lo esperabas, no hace falta hacer nada.",
+                    context.getString(R.string.notif_threat_text, domain, app),
                 ),
             )
             .setAutoCancel(true)
@@ -56,8 +55,8 @@ class ThreatAlerts(private val context: Context) {
             .setPublicVersion(
                 NotificationCompat.Builder(context, CHANNEL_ID)
                     .setSmallIcon(R.drawable.ic_stat_garbillo)
-                    .setContentTitle("Sitio peligroso bloqueado")
-                    .setContentText("Desbloquea el móvil para ver los detalles.")
+                    .setContentTitle(context.getString(R.string.notif_threat_title))
+                    .setContentText(context.getString(R.string.notif_threat_locked))
                     .build()
             )
             .build()

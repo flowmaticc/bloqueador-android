@@ -1,5 +1,8 @@
 package app.bloqueador.ui
 
+import app.bloqueador.UiText
+import app.bloqueador.R
+import androidx.compose.ui.res.stringResource
 import android.Manifest
 import android.app.Activity
 import android.content.Context
@@ -122,7 +125,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Garbillo", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
-            OutlinedButton(onClick = onOpenSettings) { Text("Ajustes") }
+            OutlinedButton(onClick = onOpenSettings) { Text(stringResource(R.string.home_settings)) }
         }
 
         Card(
@@ -135,8 +138,8 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
         ) {
             Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(protection.title, style = MaterialTheme.typography.titleLarge)
-                    Text(protection.detail, style = MaterialTheme.typography.bodyMedium)
+                    Text(protection.title.get(), style = MaterialTheme.typography.titleLarge)
+                    Text(protection.detail.get(), style = MaterialTheme.typography.bodyMedium)
                 }
                 Switch(
                     checked = running,
@@ -151,14 +154,12 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
         if (lockdown && running) {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("El móvil no tiene internet", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.home_no_internet_title), style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Android tiene activado \"Bloquear conexiones sin VPN\". Garbillo solo filtra el DNS y " +
-                            "no lleva el resto del tráfico, así que con esa opción Android corta todo internet. " +
-                            "Toca el engranaje junto a Garbillo y desactívala; puedes dejar \"VPN siempre activa\".",
+                        stringResource(R.string.home_no_internet_text),
                         style = MaterialTheme.typography.bodyMedium,
                     )
-                    OutlinedButton(onClick = { LockdownWarning.openVpnSettings(context) }) { Text("Abrir ajustes de VPN") }
+                    OutlinedButton(onClick = { LockdownWarning.openVpnSettings(context) }) { Text(stringResource(R.string.home_open_vpn_settings)) }
                 }
             }
         }
@@ -166,10 +167,9 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
         if (privateDns == "hostname") {
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer)) {
                 Column(Modifier.padding(16.dp)) {
-                    Text("El DNS privado está activado", style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.home_private_dns_title), style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "Con un proveedor de DNS privado fijo, Android se salta el filtro. " +
-                            "Ve a Ajustes → Redes → DNS privado y elige \"Automático\" o \"Desactivado\".",
+                        stringResource(R.string.home_private_dns_text),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -181,30 +181,32 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
             BatteryGuideCard()
         }
 
-        SectionCard("Desde que se activó") {
-            Text("Consultas DNS: $queries")
-            Text("Bloqueadas: $blocked" + if (queries > 0) " (${blocked * 100 / queries} %)" else "")
-            OutlinedButton(onClick = onOpenHistory) { Text("Ver historial") }
+        SectionCard(stringResource(R.string.home_since)) {
+            Text(stringResource(R.string.home_queries, queries))
+            Text(
+                if (queries > 0) stringResource(R.string.home_blocked_pct, blocked, (blocked * 100 / queries).toInt())
+                else stringResource(R.string.home_blocked, blocked)
+            )
+            OutlinedButton(onClick = onOpenHistory) { Text(stringResource(R.string.home_view_history)) }
         }
 
-        SectionCard("Configuración") {
-            Text("Apps: ${strategySummary(app.settings)}")
-            Text("Modo: ${modeSummary(app.settings)}")
+        SectionCard(stringResource(R.string.home_config)) {
+            Text(stringResource(R.string.home_apps, strategySummary(context, app.settings)))
+            Text(stringResource(R.string.home_mode, modeSummary(context, app.settings)))
             Text(
                 when {
-                    rules > 0 && threatRules > 0 ->
-                        "%,d reglas de publicidad y %,d de amenazas".format(rules, threatRules)
-                    rules > 0 -> "%,d reglas cargadas".format(rules)
+                    rules > 0 && threatRules > 0 -> stringResource(R.string.home_rules_both, rules, threatRules)
+                    rules > 0 -> stringResource(R.string.home_rules, rules)
                     // Con la VPN apagada no se cargan en memoria, para no gastar RAM.
-                    lastUpdated > 0 -> "Listas descargadas (se cargan al activar)"
-                    else -> "Sin lista descargada"
+                    lastUpdated > 0 -> stringResource(R.string.home_lists_downloaded)
+                    else -> stringResource(R.string.home_no_list)
                 }
             )
             Text(
                 if (lastUpdated > 0) {
-                    "Actualizada " + relativeTime(lastUpdated)
+                    stringResource(R.string.home_updated, relativeTime(context, lastUpdated))
                 } else {
-                    "Nunca descargada"
+                    stringResource(R.string.home_never_downloaded)
                 }
             )
             updateMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
@@ -219,9 +221,9 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
                     if (result.changed && app.vpnState.value is VpnState.Running) app.reloadEngine()
                     lastUpdated = app.repository.lastUpdated
                     updateMessage = when {
-                        !result.ok -> "Error al actualizar: ${result.errors.joinToString("; ")}"
-                        result.changed -> "Listas actualizadas"
-                        else -> "Las listas ya estaban al día"
+                        !result.ok -> context.getString(R.string.home_update_error, result.errors.joinToString("; "))
+                        result.changed -> context.getString(R.string.home_lists_updated)
+                        else -> context.getString(R.string.home_lists_current)
                     }
                     updating = false
                 }
@@ -231,7 +233,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
                     enabled = !updating,
                     // Con datos móviles se pide confirmación: las listas pueden ocupar varios MB.
                     onClick = { if (DownloadPolicy.isMetered(context)) confirmMobileData = true else updateNow() },
-                ) { Text("Actualizar ahora") }
+                ) { Text(stringResource(R.string.home_update_now)) }
                 if (updating) {
                     Spacer(Modifier.width(12.dp))
                     CircularProgressIndicator()
@@ -240,17 +242,14 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
             if (confirmMobileData) {
                 AlertDialog(
                     onDismissRequest = { confirmMobileData = false },
-                    title = { Text("¿Descargar con esta red?") },
+                    title = { Text(stringResource(R.string.home_metered_title)) },
                     text = {
-                        Text(
-                            "Estás usando datos móviles o una wifi con límite de datos. Descargar las listas puede " +
-                                "ocupar entre 5 y 40 MB según las que tengas activadas (si ya están al día, casi nada)."
-                        )
+                        Text(stringResource(R.string.home_metered_text))
                     },
                     confirmButton = {
-                        TextButton(onClick = { confirmMobileData = false; updateNow() }) { Text("Descargar") }
+                        TextButton(onClick = { confirmMobileData = false; updateNow() }) { Text(stringResource(R.string.home_download)) }
                     },
-                    dismissButton = { TextButton(onClick = { confirmMobileData = false }) { Text("Cancelar") } },
+                    dismissButton = { TextButton(onClick = { confirmMobileData = false }) { Text(stringResource(R.string.common_cancel)) } },
                 )
             }
         }
@@ -260,7 +259,9 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
 }
 
 /** Lo que se muestra en la tarjeta de estado. [warning]: el filtro está encendido pero no protege del todo. */
-internal data class Protection(val title: String, val detail: String, val warning: Boolean = false)
+internal data class Protection(val title: UiText, val detail: UiText, val warning: Boolean = false) {
+    constructor(title: Int, detail: Int, warning: Boolean = false) : this(UiText.res(title), UiText.res(detail), warning)
+}
 
 /**
  * Estado real de la protección: con la VPN encendida no basta para decir "Protegido"; también hacen
@@ -275,30 +276,17 @@ internal fun protectionOf(
     lockdown: Boolean = false,
 ): Protection =
     when (state) {
-        VpnState.Stopped -> Protection("Desactivado", "La publicidad no se está filtrando")
-        VpnState.Starting -> Protection("Activando…", "Preparando el filtro")
-        is VpnState.Error -> Protection("Error", state.message, warning = true)
+        VpnState.Stopped -> Protection(R.string.state_off, R.string.state_off_text)
+        VpnState.Starting -> Protection(R.string.state_starting, R.string.state_preparing)
+        is VpnState.Error -> Protection(UiText.res(R.string.state_error), state.message, warning = true)
         is VpnState.Running -> when {
-            state.loadingList -> Protection("Activando…", "Cargando la lista de bloqueo…")
-            lockdown -> Protection("Sin internet", "Un ajuste de Android corta la conexión (mira el aviso de abajo)", warning = true)
-            privateDnsFixed -> Protection("Sin efecto", "El DNS privado de Android se salta el filtro (mira el aviso de abajo)", warning = true)
-            rules == 0 && waitingForWifi -> Protection(
-                "Esperando a una wifi",
-                "Las listas se descargarán en cuanto te conectes a una wifi sin límite de datos. Si no quieres " +
-                    "esperar, pulsa \"Actualizar ahora\" (usará la red actual).",
-                warning = true,
-            )
-            rules == 0 -> Protection(
-                "Protección incompleta",
-                "No hay ninguna lista cargada. Comprueba la conexión y pulsa \"Actualizar ahora\".",
-                warning = true,
-            )
-            dnsSilent -> Protection(
-                "Sin respuesta del DNS",
-                "El filtro está activo, pero el DNS de la red no contesta. ¿Hay conexión a Internet?",
-                warning = true,
-            )
-            else -> Protection("Protegido", "Filtrando publicidad y rastreadores")
+            state.loadingList -> Protection(R.string.state_starting, R.string.state_loading)
+            lockdown -> Protection(R.string.state_no_internet, R.string.state_no_internet_text, warning = true)
+            privateDnsFixed -> Protection(R.string.state_no_effect, R.string.state_no_effect_text, warning = true)
+            rules == 0 && waitingForWifi -> Protection(R.string.state_waiting_wifi, R.string.state_waiting_wifi_text, warning = true)
+            rules == 0 -> Protection(R.string.state_incomplete, R.string.state_incomplete_text, warning = true)
+            dnsSilent -> Protection(R.string.state_dns_silent, R.string.state_dns_silent_text, warning = true)
+            else -> Protection(R.string.state_protected, R.string.state_protected_text)
         }
     }
 

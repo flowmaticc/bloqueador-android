@@ -13,7 +13,7 @@ class ProtectionStateTest {
     @Test
     fun `solo dice Protegido si hay listas, el DNS contesta y no hay DNS privado fijo`() {
         val ok = protectionOf(running, rules = 1000, dnsSilent = false, privateDnsFixed = false)
-        assertEquals("Protegido", ok.title)
+        assertEquals(app.bloqueador.UiText.res(app.bloqueador.R.string.state_protected), ok.title)
         assertFalse(ok.warning)
     }
 
@@ -22,7 +22,7 @@ class ProtectionStateTest {
         val noLists = protectionOf(running, rules = 0, dnsSilent = false, privateDnsFixed = false)
         val silent = protectionOf(running, rules = 1000, dnsSilent = true, privateDnsFixed = false)
         val privateDns = protectionOf(running, rules = 1000, dnsSilent = false, privateDnsFixed = true)
-        listOf(noLists, silent, privateDns).forEach { assertTrue(it.title, it.warning) }
+        listOf(noLists, silent, privateDns).forEach { assertTrue(it.title.toString(), it.warning) }
         assertEquals(3, listOf(noLists, silent, privateDns).map { it.title }.toSet().size)
     }
 
@@ -31,13 +31,13 @@ class ProtectionStateTest {
         assertFalse(protectionOf(VpnState.Running(loadingList = true), 0, dnsSilent = true, privateDnsFixed = false).warning)
         assertFalse(protectionOf(VpnState.Starting, 0, dnsSilent = false, privateDnsFixed = false).warning)
         assertFalse(protectionOf(VpnState.Stopped, 0, dnsSilent = false, privateDnsFixed = false).warning)
-        assertTrue(protectionOf(VpnState.Error("x"), 0, dnsSilent = false, privateDnsFixed = false).warning)
+        assertTrue(protectionOf(VpnState.Error(app.bloqueador.UiText.raw("x")), 0, dnsSilent = false, privateDnsFixed = false).warning)
     }
 
     @Test
     fun `con "Bloquear conexiones sin VPN" no dice Protegido`() {
         val p = protectionOf(VpnState.Running(loadingList = false), 1000, dnsSilent = false, privateDnsFixed = false, lockdown = true)
         assertTrue(p.warning)
-        org.junit.Assert.assertEquals("Sin internet", p.title)
+        org.junit.Assert.assertEquals(app.bloqueador.UiText.res(app.bloqueador.R.string.state_no_internet), p.title)
     }
 }

@@ -29,9 +29,9 @@ class SiteCoverageTest {
         val lists = sources.associateWith { BlocklistParser.parse(download(it.url).lineSequence()).build() }
         val combos = BlockMode.entries.flatMap { mode ->
             listOf(
-                mode.label to listOf(mode.source),
-                "${mode.label} + GoodbyeAds" to listOf(mode.source, ExtraLayers.all.first { it.id == "goodbyeads" }),
-                "${mode.label} + todas" to listOf(mode.source) + ExtraLayers.all,
+                mode.name to listOf(mode.source),
+                "${mode.name} + GoodbyeAds" to listOf(mode.source, ExtraLayers.all.first { it.id == "goodbyeads" }),
+                "${mode.name} + todas" to listOf(mode.source) + ExtraLayers.all,
             )
         }
 
@@ -55,7 +55,7 @@ class SiteCoverageTest {
             val strict = lists.getValue(BlockMode.STRICT.source)
             out.appendLine("\nNo bloqueados por Equilibrado:")
             entries.filter { !balanced.isBlocked(it.second) }.forEach { (c, d) ->
-                val who = lists.filter { (_, m) -> m.isBlocked(d) }.keys.joinToString { it.label }
+                val who = lists.filter { (_, m) -> m.isBlocked(d) }.keys.joinToString { it.id }
                 out.appendLine("- ${if (c.isNotEmpty()) "$c: " else ""}`$d`" +
                     (if (strict.isBlocked(d)) " (Estricto sí)" else "") +
                     if (who.isNotEmpty()) " — $who" else " — ninguna lista")

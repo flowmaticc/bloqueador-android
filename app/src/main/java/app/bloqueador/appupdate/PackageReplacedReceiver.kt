@@ -43,12 +43,12 @@ class PackageReplacedReceiver : BroadcastReceiver() {
             PackageManager.PERMISSION_GRANTED
         ) return
         context.getSystemService(NotificationManager::class.java).createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "Actualizaciones de la app", NotificationManager.IMPORTANCE_LOW)
+            NotificationChannel(CHANNEL_ID, context.getString(R.string.notif_ch_app_updates), NotificationManager.IMPORTANCE_LOW)
         )
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_garbillo)
-            .setContentTitle("Garbillo actualizado a la versión ${BuildConfig.VERSION_NAME}")
-            .setContentText("Todo sigue como estaba.")
+            .setContentTitle(context.getString(R.string.notif_updated_title, BuildConfig.VERSION_NAME))
+            .setContentText(context.getString(R.string.notif_updated_text))
             .setAutoCancel(true)
             .setContentIntent(
                 PendingIntent.getActivity(

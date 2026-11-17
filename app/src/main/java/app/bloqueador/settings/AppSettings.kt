@@ -1,20 +1,24 @@
 package app.bloqueador.settings
 
+import app.bloqueador.R
+import app.bloqueador.UiText
 import android.content.Context
 import app.bloqueador.apps.AppStrategy
 import app.bloqueador.lists.BlockMode
 import app.bloqueador.lists.ExtraLayers
 
 /** Frecuencia de actualización automática de listas. [hours] = 0 → solo manual. */
-enum class UpdateFrequency(val label: String, val description: String, val hours: Long) {
-    EVERY_12H("Cada 12 horas", "Recomendado.", 12),
-    EVERY_24H("Cada 24 horas", "Algo menos de datos y batería.", 24),
-    MANUAL("Solo manual", "Solo cuando pulses \"Actualizar ahora\".", 0),
+enum class UpdateFrequency(val label: UiText, val description: UiText, val hours: Long) {
+    EVERY_12H(UiText.res(R.string.freq_12h), UiText.res(R.string.freq_12h_desc), 12),
+    EVERY_24H(UiText.res(R.string.freq_24h), UiText.res(R.string.freq_24h_desc), 24),
+    MANUAL(UiText.res(R.string.freq_manual), UiText.res(R.string.freq_manual_desc), 0),
 }
 
 /** Tiempo que se conserva el historial. */
-enum class HistoryRetention(val label: String, val hours: Long) {
-    H1("1 hora", 1), H3("3 horas", 3), H6("6 horas", 6), H24("24 horas", 24);
+enum class HistoryRetention(val hours: Long) {
+    H1(1), H3(3), H6(6), H24(24);
+
+    val label: UiText get() = UiText.Plural(R.plurals.retention_hours, hours.toInt())
 
     val millis: Long get() = hours * 3_600_000
 }

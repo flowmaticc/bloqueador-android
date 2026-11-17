@@ -13,6 +13,9 @@ import kotlinx.coroutines.flow.StateFlow
 /** Estado global mínimo compartido entre el servicio VPN y la UI. */
 class BloqueadorApp : Application() {
 
+    // Android 8 a 12: el idioma elegido en Ajustes (en 13+ lo aplica el sistema).
+    override fun attachBaseContext(base: android.content.Context) = super.attachBaseContext(AppLanguage.wrap(base))
+
     lateinit var settings: AppSettings
         private set
 
@@ -50,7 +53,7 @@ class BloqueadorApp : Application() {
             repository.load()
         } catch (e: OutOfMemoryError) {
             app.bloqueador.diag.ErrorReports.record(this, "listas_memoria", e)
-            throw java.io.IOException("No hay memoria suficiente para cargar todas las listas; se mantienen las anteriores.", e)
+            throw java.io.IOException(getString(R.string.lists_out_of_memory), e)
         }
         engine.update(filters)
     }
@@ -82,5 +85,5 @@ sealed interface VpnState {
     data object Stopped : VpnState
     data object Starting : VpnState
     data class Running(val loadingList: Boolean) : VpnState
-    data class Error(val message: String) : VpnState
+    data class Error(val message: UiText) : VpnState
 }

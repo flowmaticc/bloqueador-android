@@ -1,5 +1,7 @@
 package app.bloqueador.ui
 
+import app.bloqueador.R
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -52,7 +54,7 @@ fun AppUpdateSection() {
 
     fun check() {
         busy = true
-        status = "Buscando…"
+        status = context.getString(R.string.upd_searching)
         available = null
         scope.launch {
             when (val r = updater.check(channel)) {
@@ -60,7 +62,7 @@ fun AppUpdateSection() {
                     available = r.info
                     status = null
                 }
-                UpdateCheck.UpToDate -> status = "Tienes la última versión del canal ${channel.label}."
+                UpdateCheck.UpToDate -> status = context.getString(R.string.upd_up_to_date, channel.label.get(context))
                 is UpdateCheck.Failed -> status = r.message
             }
             settings.lastAppUpdateCheck = System.currentTimeMillis()
@@ -70,43 +72,41 @@ fun AppUpdateSection() {
 
     fun install(info: UpdateInfo) {
         if (!updater.canInstall()) {
-            status = "Permite a Garbillo instalar actualizaciones y vuelve a pulsar \"Instalar\"."
+            status = context.getString(R.string.upd_allow_install)
             updater.openInstallPermissionSettings()
             return
         }
         busy = true
         progress = 0f
-        status = "Descargando ${info.versionName}…"
+        status = context.getString(R.string.upd_downloading, info.versionName)
         app.bloqueador.appupdate.InstallStatus.message.value = null
         scope.launch {
             status = try {
                 val apk = updater.download(info) { progress = it }
                 updater.install(apk)
-                "Instalando… Android te pedirá confirmación. Si Google Play Protect la bloquea o avisa de " +
-                    "que la app es desconocida, pulsa \"Más detalles\" → \"Instalar de todas formas\": sale " +
-                    "porque Garbillo no está en Google Play."
+                context.getString(R.string.upd_installing)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
                 app.bloqueador.diag.ErrorReports.record(context, "actualizacion_app", e)
-                "No se pudo actualizar: ${e.message}"
+                context.getString(R.string.upd_failed, e.message ?: "")
             }
             progress = -1f
             busy = false
         }
     }
 
-    SectionCard("Actualizaciones de la app") {
+    SectionCard(stringResource(R.string.upd_title)) {
         Text(
-            "Versión instalada: ${BuildConfig.VERSION_NAME} (${updater.installedVersionCode})",
+            stringResource(R.string.upd_installed_version, BuildConfig.VERSION_NAME, updater.installedVersionCode),
             style = MaterialTheme.typography.bodyMedium,
         )
-        Text("Canal de actualizaciones:", style = MaterialTheme.typography.bodyMedium)
+        Text(stringResource(R.string.upd_channel), style = MaterialTheme.typography.bodyMedium)
         UpdateChannel.entries.forEach { c ->
             RadioRow(
                 selected = c == channel,
-                title = c.label + if (c == UpdateChannel.STABLE) " (recomendado)" else "",
-                description = c.description,
+                title = if (c == UpdateChannel.STABLE) stringResource(R.string.common_recommended, c.label.get()) else c.label.get(),
+                description = c.description.get(),
                 onClick = {
                     channel = c
                     settings.updateChannel = c
@@ -117,17 +117,16 @@ fun AppUpdateSection() {
         }
         if (channel != UpdateChannel.STABLE) {
             Text(
-                "Para volver a Estable desde una versión más nueva habrá que esperar a que salga una " +
-                    "estable superior (Android no permite instalar una versión anterior).",
+                stringResource(R.string.upd_back_to_stable),
                 style = MaterialTheme.typography.bodySmall,
             )
         }
 
         available?.let { info ->
-            Text("Nueva versión disponible: ${info.versionName}", style = MaterialTheme.typography.titleSmall)
+            Text(stringResource(R.string.upd_available, info.versionName), style = MaterialTheme.typography.titleSmall)
             if (info.isUrgentFor(updater.installedVersionCode)) {
                 Text(
-                    "Importante: tu versión tiene un fallo de seguridad corregido en esta. Instálala cuanto antes.",
+                    stringResource(R.string.upd_urgent),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error,
                 )
@@ -139,17 +138,16 @@ fun AppUpdateSection() {
                 else info.notes.take(2000).substringBeforeLast('\n') + "\n…"
                 Text(notes, style = MaterialTheme.typography.bodySmall)
             }
-            Button(enabled = !busy, onClick = { install(info) }) { Text("Descargar e instalar") }
+            Button(enabled = !busy, onClick = { install(info) }) { Text(stringResource(R.string.upd_download_install)) }
         }
         if (progress >= 0f) LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
         status?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(enabled = !busy, onClick = ::check) { Text("Buscar ahora") }
+            OutlinedButton(enabled = !busy, onClick = ::check) { Text(stringResource(R.string.upd_check_now)) }
         }
         Text(
-            "Se comprueba solo una vez al día y te avisa con una notificación. Nunca se instala nada " +
-                "sin que lo confirmes.",
+            stringResource(R.string.upd_daily_note),
             style = MaterialTheme.typography.bodySmall,
         )
     }

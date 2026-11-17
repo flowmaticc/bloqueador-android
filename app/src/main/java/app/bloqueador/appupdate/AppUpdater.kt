@@ -1,5 +1,6 @@
 package app.bloqueador.appupdate
 
+import app.bloqueador.R
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -50,14 +51,14 @@ class AppUpdater(private val context: Context, private val repo: String = BuildC
             if (info.versionCode > installedVersionCode) UpdateCheck.Available(info) else UpdateCheck.UpToDate
         } catch (e: HttpStatus) {
             UpdateCheck.Failed(
-                if (e.code == 404) "No se encuentra la versión publicada en GitHub. Vuelve a probar más tarde."
-                else "GitHub respondió con el error ${e.code}."
+                if (e.code == 404) context.getString(R.string.upd_err_not_found)
+                else context.getString(R.string.upd_err_github, e.code)
             )
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
             Log.w(TAG, "Fallo al buscar actualizaciones", e)
-            UpdateCheck.Failed("No se pudo comprobar: ${e.message ?: "sin conexión"}")
+            UpdateCheck.Failed(context.getString(R.string.upd_err_check, e.message ?: context.getString(R.string.upd_err_offline)))
         }
     }
 
@@ -107,7 +108,7 @@ class AppUpdater(private val context: Context, private val repo: String = BuildC
         try {
             if (conn.responseCode != 200) throw IOException("HTTP ${conn.responseCode}")
             val total = conn.contentLengthLong.takeIf { it > 0 }
-            if (total != null && total > MAX_APK_BYTES) throw IOException("La descarga es demasiado grande.")
+            if (total != null && total > MAX_APK_BYTES) throw IOException(context.getString(R.string.upd_err_too_big))
             val digest = MessageDigest.getInstance("SHA-256")
             conn.inputStream.use { input ->
                 file.outputStream().use { out ->
@@ -119,7 +120,7 @@ class AppUpdater(private val context: Context, private val repo: String = BuildC
                         out.write(buf, 0, n)
                         digest.update(buf, 0, n)
                         read += n
-                        if (read > MAX_APK_BYTES) throw IOException("La descarga es demasiado grande.")
+                        if (read > MAX_APK_BYTES) throw IOException(context.getString(R.string.upd_err_too_big))
                         if (total != null) progress(read.toFloat() / total)
                     }
                 }
@@ -127,11 +128,11 @@ class AppUpdater(private val context: Context, private val repo: String = BuildC
             val sha = digest.digest().joinToString("") { "%02x".format(it) }
             if (sha != info.sha256) {
                 file.delete()
-                throw IOException("La descarga no coincide con la publicada (huella distinta).")
+                throw IOException(context.getString(R.string.upd_err_hash))
             }
             if (!signedLikeThisApp(file)) {
                 file.delete()
-                throw IOException("La descarga no es de Garbillo o no está firmada con su clave.")
+                throw IOException(context.getString(R.string.upd_err_signature))
             }
             file
         } finally {
@@ -231,7 +232,7 @@ class AppUpdater(private val context: Context, private val repo: String = BuildC
     /** En la versión publicada solo se descarga por HTTPS y de GitHub. */
     private fun requireTrusted(url: String): String {
         if (BuildConfig.DEBUG && url.startsWith("http://127.0.0.1")) return url
-        if (!isTrustedUrl(url)) throw IOException("Dirección de descarga no permitida.")
+        if (!isTrustedUrl(url)) throw IOException(context.getString(R.string.upd_err_url))
         return url
     }
 
@@ -279,7 +280,7 @@ class InstallResultReceiver : BroadcastReceiver() {
                 context.startActivity(confirm.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
             PackageInstaller.STATUS_SUCCESS -> Log.i(AppUpdater.TAG, "Actualización instalada")
-            PackageInstaller.STATUS_FAILURE_ABORTED -> InstallStatus.message.value = "Instalación cancelada."
+            PackageInstaller.STATUS_FAILURE_ABORTED -> InstallStatus.message.value = context.getString(R.string.upd_install_cancelled)
             else -> {
                 Log.w(
                     AppUpdater.TAG,
@@ -287,14 +288,10 @@ class InstallResultReceiver : BroadcastReceiver() {
                 )
                 val message = when (status) {
                     PackageInstaller.STATUS_FAILURE_CONFLICT, PackageInstaller.STATUS_FAILURE_INCOMPATIBLE ->
-                        "No se pudo actualizar: la versión instalada está firmada con otra clave. " +
-                            "Desinstálala una vez e instala la de GitHub."
-                    PackageInstaller.STATUS_FAILURE_STORAGE -> "No se pudo actualizar: falta espacio."
-                    PackageInstaller.STATUS_FAILURE_BLOCKED ->
-                        "Android bloqueó la actualización. Si fue Google Play Protect, vuelve a intentarlo y, en " +
-                            "su aviso, pulsa \"Más detalles\" → \"Instalar de todas formas\". Si el móvil lo gestiona " +
-                            "una empresa o un colegio, puede que no permita instalar apps de fuera de Google Play."
-                    else -> "No se pudo instalar la actualización."
+                        context.getString(R.string.upd_install_conflict)
+                    PackageInstaller.STATUS_FAILURE_STORAGE -> context.getString(R.string.upd_install_storage)
+                    PackageInstaller.STATUS_FAILURE_BLOCKED -> context.getString(R.string.upd_install_blocked)
+                    else -> context.getString(R.string.upd_install_failed)
                 }
                 InstallStatus.message.value = message
                 android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()

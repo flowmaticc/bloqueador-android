@@ -1,5 +1,7 @@
 package app.bloqueador.ui
 
+import app.bloqueador.R
+import androidx.compose.ui.res.stringResource
 import android.net.VpnService
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -34,6 +36,9 @@ import app.bloqueador.apps.AppStrategy
 import app.bloqueador.vpn.DnsVpnService
 
 class MainActivity : ComponentActivity() {
+    override fun attachBaseContext(base: android.content.Context) =
+        super.attachBaseContext(app.bloqueador.AppLanguage.wrap(base))
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -141,7 +146,7 @@ private fun AppRoot() {
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                ScreenHeader("¿Qué apps quieres proteger?") { screen = Screen.SETTINGS }
+                ScreenHeader(stringResource(R.string.onb_apps_title)) { screen = Screen.SETTINGS }
                 StrategyChooser(pending) { pending = it }
                 Button(
                     modifier = Modifier.fillMaxWidth(),
@@ -153,7 +158,7 @@ private fun AppRoot() {
                             screen = Screen.APPS
                         }
                     },
-                ) { Text("Continuar") }
+                ) { Text(stringResource(R.string.common_continue)) }
             }
         }
 

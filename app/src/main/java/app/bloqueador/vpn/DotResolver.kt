@@ -1,5 +1,7 @@
 package app.bloqueador.vpn
 
+import app.bloqueador.R
+import app.bloqueador.UiText
 import android.util.Log
 import app.bloqueador.dns.DnsMessage
 import app.bloqueador.dns.IpPacket
@@ -22,17 +24,17 @@ import javax.net.ssl.SSLSocket
 import javax.net.ssl.SSLSocketFactory
 
 /** Servicio de DNS cifrado (lista cerrada: se elige en Ajustes, no se escribe a mano). */
-enum class DotProvider(val label: String, val description: String, val hostname: String, val addresses: List<String>) {
+enum class DotProvider(val label: UiText, val description: UiText, val hostname: String, val addresses: List<String>) {
     QUAD9(
-        "Quad9", "Fundación suiza sin ánimo de lucro. Sin registros con tu IP; bloquea además dominios de malware.",
+        UiText.raw("Quad9"), UiText.res(R.string.dot_quad9_desc),
         "dns.quad9.net", listOf("9.9.9.9", "149.112.112.112", "2620:fe::fe", "2620:fe::9"),
     ),
     CLOUDFLARE(
-        "Cloudflare", "El más rápido en la mayoría de sitios. Borra los registros en 24 horas.",
+        UiText.raw("Cloudflare"), UiText.res(R.string.dot_cloudflare_desc),
         "one.one.one.one", listOf("1.1.1.1", "1.0.0.1", "2606:4700:4700::1111", "2606:4700:4700::1001"),
     ),
     MULLVAD(
-        "Mullvad", "Empresa sueca de VPN centrada en privacidad. Sin registros, sin filtrado propio.",
+        UiText.raw("Mullvad"), UiText.res(R.string.dot_mullvad_desc),
         "dns.mullvad.net", listOf("194.242.2.2", "2a07:e340::2"),
     );
 

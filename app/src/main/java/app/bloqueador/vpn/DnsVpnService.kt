@@ -2,6 +2,8 @@ package app.bloqueador.vpn
 
 import android.os.SystemClock
 import app.bloqueador.intentar
+import app.bloqueador.AppLanguage
+import app.bloqueador.UiText
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -63,6 +65,9 @@ import java.net.DatagramSocket
  * reenvían al DNS real de la red con sockets protegidos (fuera del túnel).
  */
 class DnsVpnService : VpnService() {
+
+    // Android 8 a 12: notificaciones en el idioma elegido en Ajustes.
+    override fun attachBaseContext(base: Context) = super.attachBaseContext(AppLanguage.wrap(base))
 
     /** Una interfaz tun abierta, con su hilo lector y la tubería que sirve para despertarlo. */
     private class Tunnel(
@@ -197,7 +202,7 @@ class DnsVpnService : VpnService() {
         }
         if (opened == null) {
             // null = la app no tiene permiso VPN (p. ej. otra VPN lo tiene ahora).
-            app.setVpnState(VpnState.Error("No se pudo activar la VPN. ¿Hay otra VPN activa?"))
+            app.setVpnState(VpnState.Error(UiText.res(R.string.vpn_error_establish)))
             ErrorReports.record(this, "vpn_no_activa", null, "establish")
             stopVpn(keepState = true)
             return

@@ -20,6 +20,17 @@ val appVersionCode = (findProperty("versionCode") as String?)?.toInt()
 val appVersionName = (findProperty("versionName") as String?) ?: (property("appVersionName") as String)
 
 /**
+ * Idiomas de la app: inglés (res/values, el idioma por defecto) más uno por cada carpeta
+ * res/values-xx con un strings.xml. Para añadir un idioma basta con crear esa carpeta y su fichero:
+ * la lista de idiomas de Android (generateLocaleConfig) y el selector de Ajustes se actualizan solos.
+ */
+val appLanguages: List<String> = listOf("en") + file("src/main/res").listFiles().orEmpty()
+    .filter { it.isDirectory && it.name.startsWith("values-") && File(it, "strings.xml").isFile }
+    .map { it.name.removePrefix("values-").replace("-r", "-") }
+    .filter { Regex("^[a-z]{2,3}(-[A-Z]{2})?$").matches(it) }
+    .sorted()
+
+/**
  * Firma de versiones: en CI desde variables de entorno (secretos del repositorio); en local desde
  * el fichero indicado por -PkeystoreProperties o ~/.bloqueador-keys/keystore.properties.
  * Sin clave, la versión de publicación se compila sin firmar.
@@ -59,6 +70,8 @@ android {
             "String", "UPDATE_API_BASE",
             "\"${(findProperty("updateApiBase") as String?) ?: "https://api.github.com"}\"",
         )
+        // Idiomas disponibles (ver appLanguages): el selector de Ajustes → Idioma los lee de aquí.
+        buildConfigField("String[]", "LANGUAGES", appLanguages.joinToString(", ", "{", "}") { "\"$it\"" })
         // Donde están los update.json estáticos y los APK (-PupdateDownloadBase=http://127.0.0.1:8000 en pruebas).
         buildConfigField(
             "String", "UPDATE_DOWNLOAD_BASE",
@@ -114,6 +127,10 @@ android {
     }
     kotlinOptions {
         jvmTarget = "17"
+    }
+    // Genera la lista de idiomas para Android 13+ (Ajustes del sistema → Apps → Garbillo → Idioma).
+    androidResources {
+        generateLocaleConfig = true
     }
     buildFeatures {
         compose = true

@@ -1,5 +1,7 @@
 package app.bloqueador.ui
 
+import app.bloqueador.R
+import androidx.compose.ui.res.stringResource
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -71,34 +73,24 @@ fun OnboardingScreen(onDone: () -> Unit) {
     BackHandler(enabled = step > 0) { step = if (step == 3 && strategy == AppStrategy.ALL) 1 else step - 1 }
 
     when (step) {
-        0 -> OnboardingPage(title = "Bienvenido a Garbillo", button = "Continuar", onNext = { step = 1 }) {
-            Bullet(
-                "Bloquea publicidad, rastreadores y webs peligrosas",
-                "En todo el móvil: en el navegador y dentro de las apps, sin root.",
-            )
-            Bullet(
-                "Usa una VPN local, no un servidor externo",
-                "La \"VPN\" vive dentro del móvil y solo mira a qué dominio quiere conectarse cada app. No ve lo " +
-                    "que haces y tu navegación no sale del móvil.",
-            )
-            Bullet("Lo que no puede quitar", LIMITS_TEXT)
-            Bullet(
-                "Verás una llave y una notificación fija",
-                "Android las muestra siempre que hay una VPN activa. Es normal y no gasta batería. La primera vez " +
-                    "que actives el filtro, Android te pedirá permiso (\"Solicitud de conexión\").",
-            )
+        0 -> OnboardingPage(
+            title = stringResource(R.string.onb_welcome_title),
+            button = stringResource(R.string.common_continue),
+            onNext = { step = 1 },
+        ) {
+            Bullet(stringResource(R.string.onb_blocks_title), stringResource(R.string.onb_blocks_text))
+            Bullet(stringResource(R.string.onb_vpn_title), stringResource(R.string.onb_vpn_text))
+            Bullet(stringResource(R.string.onb_limits_title), stringResource(R.string.limits_text))
+            Bullet(stringResource(R.string.onb_key_title), stringResource(R.string.onb_key_text))
         }
 
         1 -> OnboardingPage(
-            title = "¿Qué apps quieres proteger?",
-            button = "Continuar",
+            title = stringResource(R.string.onb_apps_title),
+            button = stringResource(R.string.common_continue),
             onNext = { step = if (strategy == AppStrategy.ALL) 3 else 2 },
         ) {
             StrategyChooser(strategy) { strategy = it }
-            Text(
-                "Podrás cambiarlo cuando quieras en Ajustes → Apps protegidas.",
-                style = MaterialTheme.typography.bodySmall,
-            )
+            Text(stringResource(R.string.onb_apps_later), style = MaterialTheme.typography.bodySmall)
         }
 
         2 -> AppPickerScreen(
@@ -109,40 +101,39 @@ fun OnboardingScreen(onDone: () -> Unit) {
             onSave = { selection = it; step = 3 },
         )
 
-        3 -> OnboardingPage(title = "Que funcione siempre", button = "Continuar", onNext = { step = 4 }) {
-            Text(
-                "Algunos ajustes del sistema pueden apagar el filtro sin avisar. Cada paso es opcional y puedes " +
-                    "hacerlo más tarde desde Ajustes → Batería y arranque.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
+        3 -> OnboardingPage(
+            title = stringResource(R.string.onb_always_title),
+            button = stringResource(R.string.common_continue),
+            onNext = { step = 4 },
+        ) {
+            Text(stringResource(R.string.onb_always_text), style = MaterialTheme.typography.bodyMedium)
             SystemSteps()
         }
 
         else -> OnboardingPage(
-            title = "Descargas y ayuda",
-            button = "Empezar",
+            title = stringResource(R.string.onb_downloads_title),
+            button = stringResource(R.string.onb_start),
             enabled = reports != null,
             onNext = ::finish,
         ) {
-            SectionCard("Descargas") {
+            SectionCard(stringResource(R.string.onb_downloads_section)) {
                 SwitchRow(
-                    title = "Descargar solo con wifi (recomendado)",
-                    description = "Las listas (entre 5 y 40 MB) y las comprobaciones se hacen solas al conectarte a " +
-                        "una wifi. Lo que pidas a mano se descarga siempre.",
+                    title = stringResource(R.string.onb_wifi_only_title),
+                    description = stringResource(R.string.onb_wifi_only_text),
                     checked = wifiOnly,
                 ) { wifiOnly = it }
             }
-            SectionCard("¿Ayudas a mejorar Garbillo?") {
-                Text(ERROR_REPORTS_WHAT, style = MaterialTheme.typography.bodyMedium)
-                Text(ERROR_REPORTS_NOT, style = MaterialTheme.typography.bodySmall)
+            SectionCard(stringResource(R.string.onb_help_title)) {
+                Text(stringResource(R.string.error_reports_what), style = MaterialTheme.typography.bodyMedium)
+                Text(stringResource(R.string.error_reports_not), style = MaterialTheme.typography.bodySmall)
                 RadioRow(
                     selected = reports == true,
-                    title = "Sí, enviar informes de errores anónimos",
+                    title = stringResource(R.string.onb_reports_yes),
                     description = "",
                 ) { reports = true }
-                RadioRow(selected = reports == false, title = "No, gracias", description = "") { reports = false }
+                RadioRow(selected = reports == false, title = stringResource(R.string.onb_reports_no), description = "") { reports = false }
                 if (reports == null) {
-                    Text("Elige una opción para empezar.", style = MaterialTheme.typography.bodySmall)
+                    Text(stringResource(R.string.onb_choose_option), style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -157,7 +148,7 @@ private fun SystemSteps() {
     var notifications by remember { mutableStateOf(notificationsAllowed(context)) }
     var battery by remember { mutableStateOf(!BatteryGuide.isOptimized(context)) }
     var autostart by remember { mutableStateOf(prefs.getBoolean("autostart_guide_dismissed", false)) }
-    val autostartSteps = remember { BatteryGuide.autostartSteps() }
+    val autostartSteps = remember { BatteryGuide.autostartSteps(context) }
     val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         notifications = it
     }
@@ -173,25 +164,24 @@ private fun SystemSteps() {
 
     if (Build.VERSION.SDK_INT >= 33) {
         StepRow(
-            title = "Notificaciones",
-            text = "Para avisarte de webs peligrosas bloqueadas y de versiones nuevas.",
+            title = stringResource(R.string.onb_notifications_title),
+            text = stringResource(R.string.onb_notifications_text),
             done = notifications,
-            button = "Permitir",
+            button = stringResource(R.string.common_allow),
         ) { askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS) }
     }
     StepRow(
-        title = "Sin restricciones de batería",
-        text = "Que el ahorro de energía no cierre el filtro. Garbillo apenas gasta: duerme hasta que llega una " +
-            "consulta. Busca Garbillo y elige \"No optimizar\" o \"Sin restricciones\".",
+        title = stringResource(R.string.onb_battery_title),
+        text = stringResource(R.string.onb_battery_text),
         done = battery,
-        button = "Abrir ajustes",
+        button = stringResource(R.string.common_open_settings),
     ) { BatteryGuide.openSettings(context) }
     if (autostartSteps != null) {
         StepRow(
-            title = "Inicio automático",
-            text = "En este móvil hace falta para que el filtro vuelva solo al encenderlo o tras actualizar. $autostartSteps",
+            title = stringResource(R.string.onb_autostart_title),
+            text = stringResource(R.string.onb_autostart_text, autostartSteps),
             done = autostart,
-            button = "Abrir ajustes",
+            button = stringResource(R.string.common_open_settings),
             onDone = {
                 autostart = true
                 prefs.edit().putBoolean("autostart_guide_dismissed", true).apply()
@@ -210,12 +200,12 @@ private fun StepRow(
     onDone: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
-    SectionCard(if (done) "✓ $title" else title) {
+    SectionCard(if (done) stringResource(R.string.common_done_mark, title) else title) {
         Text(text, style = MaterialTheme.typography.bodySmall)
         if (!done) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Button(onClick = onClick) { Text(button) }
-                if (onDone != null) OutlinedButton(onClick = onDone) { Text("Ya lo hice") }
+                if (onDone != null) OutlinedButton(onClick = onDone) { Text(stringResource(R.string.common_done_it)) }
             }
         }
     }
@@ -260,10 +250,3 @@ private fun Bullet(title: String, text: String) {
         Text(text, style = MaterialTheme.typography.bodyMedium)
     }
 }
-
-/** Límites de un bloqueador por DNS, dichos con claridad. */
-internal const val LIMITS_TEXT =
-    "Los anuncios de YouTube y Twitch y las publicaciones promocionadas de redes sociales llegan por " +
-        "los mismos servidores que el contenido, así que ningún bloqueador de este tipo puede quitarlos. " +
-        "Dentro de las webs puede quedar el hueco del anuncio: para eso, usa Brave o Firefox con " +
-        "uBlock Origin; se complementan con Garbillo."
