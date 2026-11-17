@@ -110,7 +110,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
     }
 
     val running = state is VpnState.Running || state == VpnState.Starting
-    val protection = protectionOf(state, rules, dnsSilent, privateDns == "hostname", waitingForWifi)
+    val protection = protectionOf(state, rules, dnsSilent, privateDns == "hostname", waitingForWifi, lockdown)
 
     Column(
         Modifier
@@ -272,6 +272,7 @@ internal fun protectionOf(
     dnsSilent: Boolean,
     privateDnsFixed: Boolean,
     waitingForWifi: Boolean = false,
+    lockdown: Boolean = false,
 ): Protection =
     when (state) {
         VpnState.Stopped -> Protection("Desactivado", "La publicidad no se está filtrando")
@@ -279,6 +280,7 @@ internal fun protectionOf(
         is VpnState.Error -> Protection("Error", state.message, warning = true)
         is VpnState.Running -> when {
             state.loadingList -> Protection("Activando…", "Cargando la lista de bloqueo…")
+            lockdown -> Protection("Sin internet", "Un ajuste de Android corta la conexión (mira el aviso de abajo)", warning = true)
             privateDnsFixed -> Protection("Sin efecto", "El DNS privado de Android se salta el filtro (mira el aviso de abajo)", warning = true)
             rules == 0 && waitingForWifi -> Protection(
                 "Esperando a una wifi",

@@ -78,7 +78,11 @@ fun StrategyChooser(selected: AppStrategy, onSelect: (AppStrategy) -> Unit) {
 /** Resumen legible de la selección de apps actual. */
 fun strategySummary(settings: AppSettings): String = when (settings.strategy) {
     AppStrategy.ALL -> "Todas las apps"
-    AppStrategy.ALL_EXCEPT -> "Todas excepto ${settings.excludedApps.size}"
+    AppStrategy.ALL_EXCEPT -> when (val n = settings.excludedApps.size) {
+        0 -> "Todas las apps"
+        1 -> "Todas excepto 1 app"
+        else -> "Todas excepto $n apps"
+    }
     AppStrategy.ONLY -> "Solo ${settings.includedApps.size} apps"
 }
 

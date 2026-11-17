@@ -12,9 +12,10 @@ Bloqueador de publicidad, rastreadores y **sitios peligrosos** para **Android**,
 ## Cómo funciona
 
 Crea una **VPN local** (no hay ningún servidor al otro lado) por la que solo pasan las **consultas
-DNS**. Si un dominio está en una lista de publicidad o rastreo, responde que no existe y el anuncio no
-llega a cargarse; el resto se reenvía a tu DNS habitual. El tráfico normal no pasa por la app: solo ve
-nombres de dominio, nunca el contenido.
+DNS**. Si un dominio está en una lista de publicidad o rastreo, responde con la dirección vacía
+`0.0.0.0` y el anuncio no llega a cargarse; el resto se reenvía a tu DNS habitual o, si lo activas, a
+un **DNS cifrado** (Quad9, Cloudflare o Mullvad, por TLS). El tráfico normal no pasa por la app: solo
+ve nombres de dominio, nunca el contenido.
 
 - Tres niveles: **Ligero** (Hagezi Light), **Equilibrado** (Hagezi Pro, por defecto) y **Estricto**
   (Hagezi Pro++), más capas opcionales: anti-evasión DNS, lista del fabricante del móvil, juegos y
@@ -28,7 +29,9 @@ nombres de dominio, nunca el contenido.
   [web](https://flowmaticc.github.io/utilities/bloqueador-android/#reportar). Se envía solo el dominio, el
   motivo y una nota opcional (servicio en [`reportes/`](reportes/), sobre Cloudflare Workers).
 - Listas actualizadas automáticamente (solo si cambian) y consumo mínimo de batería.
-- Se actualiza sola desde GitHub Releases, con canal **Estable** (por defecto), **Beta** o **Nightly**.
+- **DNS cifrado opcional** (DNS sobre TLS): nadie en tu red ve ni cambia qué webs visitas. En una
+  wifi con página de acceso se usa el DNS de la red hasta que inicias sesión.
+- Se actualiza sola desde GitHub Releases, con canal **Estable** (por defecto) o **Beta**.
 
 Si la red devuelve respuestas DNS demasiado grandes para UDP, Garbillo las pide completas por TCP.
 
@@ -45,6 +48,21 @@ Para los huecos de anuncios dentro de las webs, combínalo con Brave o Firefox +
 4. Abre la app, elige qué apps proteger y activa el filtro aceptando la solicitud de VPN de Android.
 
 Requiere Android 8.0 o superior.
+
+También puedes instalarla y recibir las actualizaciones con
+[Obtainium](https://github.com/ImranR98/Obtainium): añade
+`https://github.com/flowmaticc/bloqueador-android` como app
+([enlace directo](obtainium://add/https://github.com/flowmaticc/bloqueador-android)).
+
+**Comprueba que el APK es auténtico.** Todas las versiones van firmadas con el mismo certificado. Su
+huella SHA-256 es:
+
+```
+ee:5b:77:ee:24:58:c5:a6:a4:5e:3b:c6:a3:da:ac:ee:fb:31:79:19:49:3d:4d:85:8e:4f:46:a9:72:56:83:ce
+```
+
+Con el SDK de Android: `apksigner verify --print-certs garbillo.apk`. En el móvil la muestran apps
+como AppVerifier u Obtainium. Si no coincide, no la instales.
 
 ## Permisos
 
@@ -67,13 +85,15 @@ de medición: [docs/PRUEBAS.md](docs/PRUEBAS.md).
 
 ### Versiones
 
-- **Nightly:** cada cambio en `main` (pre-release `nightly`, se sustituye).
-- **Beta:** etiqueta `vX.Y.Z-beta.N` o `vX.Y.Z-rc.N`.
-- **Estable:** etiqueta `vX.Y.Z` (antes, actualizar `appVersionName` en `gradle.properties`).
+- **Beta:** cada cambio en `main`, solo si la variable del repositorio `PUBLICAR_BETA` vale `true`
+  (una única pre-release `beta` que se sustituye).
+- **Estable:** a mano, desde Actions → Publicar → canal "estable", con aprobación. Antes, actualizar
+  `appVersionName` en `gradle.properties` y añadir su sección en `NOVEDADES.md`.
 
 GitHub Actions ([release.yml](.github/workflows/release.yml)) compila, pasa los tests, firma el APK
-y publica cada versión con un `update.json` (versionCode, nombre y huella SHA-256) que usa la app
-para actualizarse. La firma usa secretos cifrados del repositorio.
+(v2 + v3), comprueba que la huella del certificado es la de arriba y publica cada versión con un
+`update.json` (versión, huella SHA-256 del APK, notas y avisos) que usa la app para actualizarse. El
+job que firma no puede escribir en el repositorio y el que publica no ve la clave.
 
 ### Estructura
 
@@ -87,7 +107,7 @@ para actualizarse. La firma usa secretos cifrados del repositorio.
 | `appupdate` | Actualizaciones de la app desde GitHub Releases (canales) |
 | `history` | Historial, registro por lotes, app de origen y "Ver en la web" |
 | `update` | Tarea periódica de actualización de listas |
-| `vpn` | `DnsVpnService`, reenvío de consultas y seguimiento del DNS de la red |
+| `vpn` | `DnsVpnService`, reenvío de consultas (UDP o DNS cifrado por TLS) y seguimiento de la red |
 | `ui` | Interfaz (Jetpack Compose) |
 
 ## Licencia

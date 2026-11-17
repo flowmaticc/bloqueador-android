@@ -1,0 +1,37 @@
+# Avisos y propuestas de actualización de dependencias (una vez por semana, agrupadas para no
+# llenar el repositorio de cambios sueltos). Ninguna se aplica sola: llegan como pull request.
+version: 2
+updates:
+  # Acciones de GitHub (fijadas por SHA en los workflows).
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      acciones:
+        patterns: ["*"]
+    commit-message:
+      prefix: "Dependencias"
+
+  # Librerías de la app (Gradle).
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      android:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    commit-message:
+      prefix: "Dependencias"
+
+  # Servicio de reportes (Cloudflare Worker).
+  - package-ecosystem: npm
+    directory: /reportes
+    schedule:
+      interval: monthly
+    commit-message:
+      prefix: "Dependencias"

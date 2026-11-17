@@ -33,4 +33,11 @@ class ProtectionStateTest {
         assertFalse(protectionOf(VpnState.Stopped, 0, dnsSilent = false, privateDnsFixed = false).warning)
         assertTrue(protectionOf(VpnState.Error("x"), 0, dnsSilent = false, privateDnsFixed = false).warning)
     }
+
+    @Test
+    fun `con "Bloquear conexiones sin VPN" no dice Protegido`() {
+        val p = protectionOf(VpnState.Running(loadingList = false), 1000, dnsSilent = false, privateDnsFixed = false, lockdown = true)
+        assertTrue(p.warning)
+        org.junit.Assert.assertEquals("Sin internet", p.title)
+    }
 }
