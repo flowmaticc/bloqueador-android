@@ -21,3 +21,6 @@ keystore.properties
 # Registros de fallos de la JVM
 hs_err_pid*.log
 replay_pid*.log
+
+# Caché local de Cloudflare wrangler
+.wrangler/

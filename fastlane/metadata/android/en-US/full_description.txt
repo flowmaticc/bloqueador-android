@@ -1,0 +1,15 @@
+Garbillo blocks ads, trackers and dangerous sites (phishing, malware, scams) across your whole phone: in the browser, inside apps and in games. No root, no accounts, and your browsing is never sent to any server.
+
+<b>How it works.</b> It creates a local VPN, with no server on the other end, that only carries DNS queries. If a domain is on a block list, the connection never happens. All other traffic goes straight out: Garbillo only sees domain names, never the content.
+
+<b>Includes:</b>
+<ul>
+<li>Three blocking levels (Hagezi lists) and optional extra layers</li>
+<li>Protection against phishing, malware and scams, with an alert when a dangerous site is blocked</li>
+<li>Optional encrypted DNS (Quad9, Cloudflare or Mullvad)</li>
+<li>Choose which apps are filtered; banking apps are excluded by default</li>
+<li>Local history from 1 to 24 hours, only on your phone</li>
+<li>Minimal battery use</li>
+</ul>
+
+<b>What it can't remove:</b> ads on YouTube and Twitch and promoted posts on social networks, because they come from the same servers as the content.

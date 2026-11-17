@@ -1,0 +1,15 @@
+Garbillo bloquea publicidad, rastreadores y sitios peligrosos (phishing, malware, estafas) en todo el móvil: en el navegador, dentro de las apps y en los juegos. Sin root, sin cuentas y sin enviar tu navegación a ningún servidor.
+
+<b>Cómo funciona.</b> Crea una VPN local, sin ningún servidor al otro lado, por la que solo pasan las consultas DNS. Si un dominio está en una lista de bloqueo, la conexión no llega a hacerse. El resto del tráfico va directo: Garbillo solo ve nombres de dominio, nunca el contenido.
+
+<b>Incluye:</b>
+<ul>
+<li>Tres niveles de bloqueo (listas de Hagezi) y capas opcionales</li>
+<li>Protección contra phishing, malware y estafas, con aviso al bloquear un sitio peligroso</li>
+<li>DNS cifrado opcional (Quad9, Cloudflare o Mullvad)</li>
+<li>Elige qué apps se filtran; las de banca se excluyen por defecto</li>
+<li>Historial local de 1 a 24 horas, solo en tu móvil</li>
+<li>Consumo mínimo de batería</li>
+</ul>
+
+<b>Lo que no puede quitar:</b> los anuncios de YouTube y Twitch y las publicaciones promocionadas de las redes sociales, porque llegan por los mismos servidores que el contenido.
