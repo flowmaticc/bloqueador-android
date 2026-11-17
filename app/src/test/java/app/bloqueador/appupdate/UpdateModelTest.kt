@@ -79,12 +79,16 @@ class UpdateModelTest {
     @Test
     fun `update json estatico con notas, aviso y version segura`() {
         val json = """{"versionCode":2100,"versionName":"0.4.0","channel":"stable","tag":"v0.4.0",
-            "apk":"bloqueador-0.4.0.apk","sha256":"AB12","notes":"## Novedades\n- **Rápido**",
+            "apk":"bloqueador-0.4.0.apk","sha256":"AB12","notes":"## Novedades\n- **Rápido**","notes_en":"- **Fast**",
             "notice":"Corrige el aviso de VPN","minSafeVersionCode":2050}"""
         val info = UpdateParser.parseStaticManifest(json, base, repo)
         assertEquals("https://github.com/flowmaticc/bloqueador-android/releases/download/v0.4.0/bloqueador-0.4.0.apk", info.apkUrl)
         assertEquals(UpdateChannel.STABLE, info.channel)
         assertEquals("Novedades\n• Rápido", info.notes)
+        assertEquals("Novedades\n• Rápido", info.notesFor("es"))
+        assertEquals("• Fast", info.notesFor("en"))
+        assertEquals("otros idiomas: las inglesas", "• Fast", info.notesFor("fr"))
+        assertEquals("sin notas en inglés: las españolas", info.notes, info.copy(notesEn = "").notesFor("en"))
         assertEquals("Corrige el aviso de VPN", info.notice)
         assertTrue(info.isUrgentFor(2048))
         assertTrue(!info.isUrgentFor(2050))

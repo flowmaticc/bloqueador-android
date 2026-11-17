@@ -198,14 +198,21 @@ jobs:
             cp app/build/outputs/apk/fdroid/release/app-fdroid-release.apk "out/${apk%.apk}-fdroid.apk"
           fi
           sha=$(sha256sum "out/$apk" | cut -d' ' -f1)
-          # Notas: la sección de la versión en NOVEDADES.md ("## 0.4.0") o, si no hay, "## Próxima versión".
-          section() { awk -v h="## $1" '$0==h{f=1;next} /^## /{f=0} f' NOVEDADES.md; }
-          notes="$(section "${{ steps.version.outputs.base }}")"
-          [ -n "$notes" ] || notes="$(section "Próxima versión")"
-          if [ "${{ steps.version.outputs.channel }}" = "stable" ] && [ -z "$(section "${{ steps.version.outputs.base }}")" ]; then
-            echo "::error::Falta la sección '## ${{ steps.version.outputs.base }}' en NOVEDADES.md"; exit 1
+          # Notas en español (NOVEDADES.md) e inglés (NOVEDADES.en.md): la sección de la versión
+          # ("## 0.4.0") o, si no hay, la de la próxima versión. La app muestra las de su idioma.
+          section() { awk -v h="## $2" '$0==h{f=1;next} /^## /{f=0} f' "$1"; }
+          base="${{ steps.version.outputs.base }}"
+          notes="$(section NOVEDADES.md "$base")"
+          [ -n "$notes" ] || notes="$(section NOVEDADES.md "Próxima versión")"
+          notes_en="$(section NOVEDADES.en.md "$base")"
+          [ -n "$notes_en" ] || notes_en="$(section NOVEDADES.en.md "Next version")"
+          if [ "${{ steps.version.outputs.channel }}" = "stable" ]; then
+            for f in NOVEDADES.md NOVEDADES.en.md; do
+              [ -n "$(section "$f" "$base")" ] || { echo "::error::Falta la sección '## $base' en $f"; exit 1; }
+            done
           fi
-          printf '%s' "$notes" > out/notas.md
+          # En GitHub, las dos: primero español y debajo inglés.
+          printf '%s\n\n---\n\n**English**\n\n%s\n' "$notes" "$notes_en" > out/notas.md
           jq -n \
             --argjson versionCode "${{ steps.version.outputs.code }}" \
             --arg versionName "${{ steps.version.outputs.name }}" \
@@ -214,10 +221,11 @@ jobs:
             --arg apk "$apk" \
             --arg sha256 "$sha" \
             --arg notes "$notes" \
+            --arg notes_en "$notes_en" \
             --arg notice "$AVISO" \
             --argjson minSafeVersionCode "$MIN_SAFE" \
             '{versionCode:$versionCode, versionName:$versionName, channel:$channel, tag:$tag, apk:$apk,
-              sha256:$sha256, notes:$notes, minSafeVersionCode:$minSafeVersionCode}
+              sha256:$sha256, notes:$notes, notes_en:$notes_en, minSafeVersionCode:$minSafeVersionCode}
              + (if $notice == "" then {} else {notice:$notice} end)' > out/update.json
           cat out/update.json
 
@@ -253,7 +261,7 @@ jobs:
             # Una sola beta: se sustituye. La antigua "nightly" (hasta la 0.3.x) se retira.
             gh release delete nightly --cleanup-tag --yes 2>/dev/null || true
             gh release delete beta --cleanup-tag --yes 2>/dev/null || true
-            { printf 'Versión de prueba con lo que llegará en la próxima versión estable.\n\n'; cat "$notes_file"; } > beta.md
+            { printf 'Versión de prueba con lo que llegará en la próxima versión estable. · Test version with what will come in the next stable release.\n\n'; cat "$notes_file"; } > beta.md
             gh release create beta $files --prerelease --target "$GITHUB_SHA" \
               --title "Beta $NAME" --notes-file beta.md
           else

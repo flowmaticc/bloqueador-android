@@ -63,8 +63,13 @@ data class UpdateInfo(
     val notice: String? = null,
     /** Las versiones por debajo de esta tienen un fallo de seguridad: se avisa con más insistencia. */
     val minSafeVersionCode: Long = 0,
+    /** Notas en inglés (NOVEDADES.en.md); [notes] son las de español. */
+    val notesEn: String = "",
 ) {
     fun isUrgentFor(installed: Long): Boolean = installed < minSafeVersionCode
+
+    /** Notas en el idioma [language] ("es", "en"…): español para "es"; inglés para el resto, si las hay. */
+    fun notesFor(language: String): String = if (language == "es" || notesEn.isBlank()) notes else notesEn
 }
 
 /** Dónde están los update.json de cada canal (ficheros estáticos: no cuentan contra la API de GitHub). */
@@ -135,6 +140,7 @@ object UpdateParser {
             notes = o.optString("notes").takeIf { it.isNotBlank() }?.let(::plainText) ?: release.notes,
             notice = notice(o),
             minSafeVersionCode = o.optLong("minSafeVersionCode", 0),
+            notesEn = plainText(o.optString("notes_en")),
         )
     }
 
@@ -159,6 +165,7 @@ object UpdateParser {
             notes = plainText(o.optString("notes")),
             notice = notice(o),
             minSafeVersionCode = o.optLong("minSafeVersionCode", 0),
+            notesEn = plainText(o.optString("notes_en")),
         )
     }
 

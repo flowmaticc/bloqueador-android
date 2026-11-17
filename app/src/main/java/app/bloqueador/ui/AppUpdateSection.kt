@@ -132,10 +132,12 @@ fun AppUpdateSection() {
                 )
             }
             info.notice?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-            if (info.notes.isNotBlank()) {
+            // En el idioma de la app (español o, para el resto, inglés).
+            val text = info.notesFor(context.resources.configuration.locales[0].language)
+            if (text.isNotBlank()) {
                 // Entera; solo si fuera muy larga se corta, y siempre al final de una línea.
-                val notes = if (info.notes.length <= 2000) info.notes
-                else info.notes.take(2000).substringBeforeLast('\n') + "\n…"
+                val notes = if (text.length <= 2000) text
+                else text.take(2000).substringBeforeLast('\n') + "\n…"
                 Text(notes, style = MaterialTheme.typography.bodySmall)
             }
             Button(enabled = !busy, onClick = { install(info) }) { Text(stringResource(R.string.upd_download_install)) }
