@@ -23,7 +23,7 @@ import java.net.URL
  * que faltan.
  *
  * Necesita red, por eso no corre en la batería normal de tests:
- *   gradlew testDebugUnitTest --tests '*TurtlecuteCoverageTest' -Pturtlecute
+ *   gradlew testGithubDebugUnitTest --tests '*TurtlecuteCoverageTest' -Pturtlecute
  * El informe queda en app/build/reports/turtlecute.md.
  *
  * La lista de turtlecute tiene licencia CC BY-NC-SA, distinta de la de este proyecto: por eso se

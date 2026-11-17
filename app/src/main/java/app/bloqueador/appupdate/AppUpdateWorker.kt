@@ -51,6 +51,11 @@ class AppUpdateWorker(context: Context, params: WorkerParameters) : CoroutineWor
 
         /** Programa la comprobación diaria con la red que pide [DownloadPolicy] (sin reiniciar su reloj). */
         fun schedule(context: Context) {
+            if (!app.bloqueador.BuildConfig.SELF_UPDATE) {
+                // Variante F-Droid / IzzyOnDroid: las actualizaciones las da la tienda.
+                WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
+                return
+            }
             val request = PeriodicWorkRequestBuilder<AppUpdateWorker>(24, TimeUnit.HOURS)
                 .setConstraints(
                     Constraints.Builder()

@@ -8,10 +8,15 @@ plugins {
 }
 
 /**
- * Versión: la base está en gradle.properties (appVersionName). En GitHub Actions se pasan
- * -PversionCode (siempre creciente, a partir del número de ejecución) y -PversionName.
+ * Versión (gradle.properties): appVersionName ("0.4.0") y appVersionCode, un entero que se sube en 1
+ * con cada versión estable. El versionCode real es appVersionCode * 1000 + 999 para la estable (así
+ * F-Droid, que compila desde el código, obtiene exactamente el mismo número) y
+ * appVersionCode * 1000 + N para las betas (-PbetaBuild=N, 0..998): siempre por encima de la estable
+ * anterior y por debajo de la siguiente. -PversionCode / -PversionName fuerzan otro valor (pruebas).
  */
-val appVersionCode = (findProperty("versionCode") as String?)?.toInt() ?: 1
+val betaBuild = (findProperty("betaBuild") as String?)?.toInt()?.also { require(it in 0..998) { "betaBuild 0..998" } }
+val appVersionCode = (findProperty("versionCode") as String?)?.toInt()
+    ?: ((property("appVersionCode") as String).toInt() * 1000 + (betaBuild ?: 999))
 val appVersionName = (findProperty("versionName") as String?) ?: (property("appVersionName") as String)
 
 /**
@@ -74,6 +79,24 @@ android {
                 enableV2Signing = true
                 enableV3Signing = true
             }
+        }
+    }
+
+    /**
+     * Dos variantes con el mismo paquete y la misma firma:
+     * - github: la de siempre, con actualizador propio desde GitHub Releases.
+     * - fdroid: sin actualizador ni permiso de instalar (F-Droid e IzzyOnDroid no permiten que la app
+     *   descargue actualizaciones por su cuenta; las actualizaciones las da la tienda).
+     */
+    flavorDimensions += "distribucion"
+    productFlavors {
+        create("github") {
+            dimension = "distribucion"
+            buildConfigField("boolean", "SELF_UPDATE", "true")
+        }
+        create("fdroid") {
+            dimension = "distribucion"
+            buildConfigField("boolean", "SELF_UPDATE", "false")
         }
     }
 

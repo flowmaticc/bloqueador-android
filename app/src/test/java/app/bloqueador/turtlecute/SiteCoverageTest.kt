@@ -14,7 +14,7 @@ import java.net.URL
  * obfusgated, adblock-tester, un periódico…). Cada fichero de la carpeta es un "sitio": dominios
  * separados por espacios o saltos de línea, opcionalmente `categoría<TAB>dominio` por línea.
  *
- *   gradlew :app:testDebugUnitTest --tests '*SiteCoverageTest' -PsiteHosts=<carpeta>
+ *   gradlew :app:testGithubDebugUnitTest --tests '*SiteCoverageTest' -PsiteHosts=<carpeta>
  *
  * Informe en app/build/reports/sites.md. Necesita red (descarga las listas).
  */

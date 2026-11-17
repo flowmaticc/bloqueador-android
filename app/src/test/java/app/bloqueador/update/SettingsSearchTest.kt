@@ -39,4 +39,11 @@ class SettingsSearchTest {
     fun `todas las categorias se pueden encontrar`() {
         SettingsSection.entries.forEach { s -> assertTrue(s.name, index.any { it.section == s }) }
     }
+
+    @Test
+    fun `la variante sin actualizador no muestra la seccion de actualizaciones`() {
+        assertTrue(app.bloqueador.ui.visibleSections(selfUpdate = true).contains(SettingsSection.APP_UPDATES))
+        assertTrue(!app.bloqueador.ui.visibleSections(selfUpdate = false).contains(SettingsSection.APP_UPDATES))
+        assertEquals(SettingsSection.entries.size - 1, app.bloqueador.ui.visibleSections(selfUpdate = false).size)
+    }
 }

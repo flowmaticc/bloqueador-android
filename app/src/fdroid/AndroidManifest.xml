@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Variante F-Droid / IzzyOnDroid: sin actualizador propio. Se quitan el permiso de instalar
+     paquetes y los receptores que solo usa el actualizador. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission
+        android:name="android.permission.REQUEST_INSTALL_PACKAGES"
+        tools:node="remove" />
+
+    <application>
+        <receiver
+            android:name=".appupdate.InstallResultReceiver"
+            tools:node="remove" />
+    </application>
+</manifest>

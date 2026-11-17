@@ -2,11 +2,11 @@
 
 | Prueba | Qué comprueba | Cómo se lanza |
 |---|---|---|
-| Tests unitarios | Parser de listas, motor de coincidencias, DNS, historial, actualizador | `gradlew testDebugUnitTest` (también en cada publicación) |
+| Tests unitarios | Parser de listas, motor de coincidencias, DNS, historial, actualizador | `gradlew testGithubDebugUnitTest` (también en cada publicación) |
 | Prueba de humo | En emulador o móvil: instalación, bienvenida, VPN, bloqueo, resolución normal, historial, apagado | `tools/smoke-test.sh <serial> <carpeta>` |
-| Cobertura turtlecute (listas) | Qué % de los dominios de [adblock.turtlecute.org](https://adblock.turtlecute.org) bloquea cada modo y capa | `gradlew testDebugUnitTest --tests '*TurtlecuteCoverageTest' -Pturtlecute` → `app/build/reports/turtlecute.md` |
+| Cobertura turtlecute (listas) | Qué % de los dominios de [adblock.turtlecute.org](https://adblock.turtlecute.org) bloquea cada modo y capa | `gradlew testGithubDebugUnitTest --tests '*TurtlecuteCoverageTest' -Pturtlecute` → `app/build/reports/turtlecute.md` |
 | Turtlecute en el dispositivo | Lo mismo, pero a través del filtro real del móvil (VPN activa) | `tools/turtlecute-device.sh <serial> [carpeta]` (la prueba de humo ya lo incluye) |
-| Cobertura por sitio | Qué % de los dominios de cualquier web (o test) bloquea cada modo y capa | `gradlew :app:testDebugUnitTest --tests '*SiteCoverageTest' -PsiteHosts=<carpeta>` → `app/build/reports/sites.md`. Cada fichero: dominios separados por espacios, o `categoría<TAB>dominio`. |
+| Cobertura por sitio | Qué % de los dominios de cualquier web (o test) bloquea cada modo y capa | `gradlew :app:testGithubDebugUnitTest --tests '*SiteCoverageTest' -PsiteHosts=<carpeta>` → `app/build/reports/sites.md`. Cada fichero: dominios separados por espacios, o `categoría<TAB>dominio`. |
 | Prueba de carga larga | Que el filtro aguanta días sin tocar el móvil, también en reposo profundo | Herramienta privada (ver abajo) |
 
 ## adblock.turtlecute.org

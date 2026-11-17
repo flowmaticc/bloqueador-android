@@ -78,6 +78,10 @@ enum class SettingsSection(val title: String, val group: String) {
     ABOUT("Acerca de", "Aplicación"),
 }
 
+/** Secciones que muestra esta variante (la de F-Droid no tiene actualizador propio). */
+fun visibleSections(selfUpdate: Boolean = BuildConfig.SELF_UPDATE): List<SettingsSection> =
+    SettingsSection.entries.filter { selfUpdate || it != SettingsSection.APP_UPDATES }
+
 /** Un ajuste concreto para el buscador: dónde está y palabras con las que se puede encontrar. */
 data class SettingEntry(val section: SettingsSection, val title: String, val keywords: String)
 
@@ -147,7 +151,10 @@ fun SettingsScreen(
 private fun SettingsHome(onBack: () -> Unit, onOpen: (SettingsSection) -> Unit) {
     val settings = BloqueadorApp.instance.settings
     var query by rememberSaveable { mutableStateOf("") }
-    val index = remember { settingsIndex(android.os.Build.MANUFACTURER) }
+    val index = remember {
+        val visible = visibleSections()
+        settingsIndex(android.os.Build.MANUFACTURER).filter { it.section in visible }
+    }
     val focus = LocalFocusManager.current
     val keyboard = LocalSoftwareKeyboardController.current
 
@@ -186,7 +193,7 @@ private fun SettingsHome(onBack: () -> Unit, onOpen: (SettingsSection) -> Unit) 
             return@Column
         }
 
-        SettingsSection.entries.groupBy { it.group }.forEach { (group, sections) ->
+        visibleSections().groupBy { it.group }.forEach { (group, sections) ->
             Text(
                 group,
                 style = MaterialTheme.typography.labelLarge,

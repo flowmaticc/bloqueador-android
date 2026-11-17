@@ -11,7 +11,7 @@ SERIAL="$1"
 OUT="$2"
 mkdir -p "$OUT"
 ADB="${ADB:-$LOCALAPPDATA/Android/Sdk/platform-tools/adb.exe}"
-APK="app/build/outputs/apk/debug/app-debug.apk"
+APK="app/build/outputs/apk/github/debug/app-github-debug.apk"
 PKG="app.bloqueador"
 a() { "$ADB" -s "$SERIAL" "$@"; }
 PASS=0; FAIL=0

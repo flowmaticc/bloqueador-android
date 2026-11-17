@@ -13,7 +13,11 @@
 # escribir pero no ve la clave de firma. Antes de publicar se comprueba que el APK lleva firma v2+v3
 # con el certificado esperado (variable CERT_SHA256).
 #
-# El versionCode es 2000 + número de ejecución de este flujo: siempre crece, en cualquier canal.
+# versionCode (ver app/build.gradle.kts): estable = appVersionCode*1000+999 (lo mismo que obtiene F-Droid al
+# compilar desde el código); beta = appVersionCode*1000 + (número de ejecución % 999).
+#
+# F-Droid / IzzyOnDroid: con la variable PUBLICAR_FDROID = "true", cada estable lleva además el APK de la
+# variante fdroid (sin actualizador propio), firmado con la misma clave: bloqueador-X.Y.Z-fdroid.apk.
 
 name: Publicar
 
@@ -71,7 +75,8 @@ jobs:
           CANAL: ${{ github.event_name == 'workflow_dispatch' && inputs.canal || 'beta' }}
         run: |
           base=$(grep '^appVersionName=' gradle.properties | cut -d= -f2)
-          code=$((2000 + ${{ github.run_number }}))
+          major=$(grep '^appVersionCode=' gradle.properties | cut -d= -f2)
+          beta_build=$(( ${{ github.run_number }} % 999 ))
           if [ "$CANAL" = "estable" ]; then
             channel=stable
             tag="v$base"
@@ -80,8 +85,12 @@ jobs:
               echo "::error::La versión $tag ya está publicada. Sube appVersionName en gradle.properties."
               exit 1
             fi
+            code=$((major * 1000 + 999))
+            beta_arg=""
           else
             channel=beta
+            code=$((major * 1000 + beta_build))
+            beta_arg="-PbetaBuild=$beta_build"
             tag=beta
             # La beta lleva el número de la versión siguiente a la última estable publicada: si
             # gradle.properties no va por delante, se usa la siguiente corrección (0.3.2 → 0.3.3).
@@ -97,6 +106,7 @@ jobs:
             echo "tag=$tag"
             echo "name=$name"
             echo "code=$code"
+            echo "beta_arg=$beta_arg"
             echo "channel=$channel"
             echo "apk=bloqueador-$name.apk"
             echo "base=${tag#v}"
@@ -119,11 +129,18 @@ jobs:
           RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          PUBLICAR_FDROID: ${{ vars.PUBLICAR_FDROID }}
         run: |
           set -o pipefail
-          ./gradlew --no-daemon :app:testReleaseUnitTest :app:assembleRelease \
-            -PversionCode=${{ steps.version.outputs.code }} \
+          tasks=":app:testGithubReleaseUnitTest :app:assembleGithubRelease"
+          if [ "${{ steps.version.outputs.channel }}" = "stable" ] && [ "$PUBLICAR_FDROID" = "true" ]; then
+            tasks="$tasks :app:assembleFdroidRelease"
+          fi
+          ./gradlew --no-daemon $tasks ${{ steps.version.outputs.beta_arg }} \
             -PversionName=${{ steps.version.outputs.name }} 2>&1 | tee build.log
+          # El versionCode lo calcula Gradle desde gradle.properties: tiene que coincidir con el previsto.
+          got=$("$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/aapt2" dump badging app/build/outputs/apk/github/release/app-github-release.apk | sed -n "s/.*versionCode='\([0-9]*\)'.*/\1/p")
+          [ "$got" = "${{ steps.version.outputs.code }}" ] || { echo "::error::versionCode $got, se esperaba ${{ steps.version.outputs.code }}"; exit 1; }
           rm -f "$RUNNER_TEMP/release.jks"
 
       - name: Errores de compilación y tests
@@ -142,7 +159,8 @@ jobs:
         env:
           CERT_SHA256: ${{ vars.CERT_SHA256 }}
         run: |
-          apk=app/build/outputs/apk/release/app-release.apk
+          for apk in app/build/outputs/apk/*/release/app-*-release.apk; do
+          echo "Comprobando $apk"
           if unzip -p "$apk" 'classes*.dex' | grep -a -q -E 'QueryLog|consultas-|app/bloqueador/loadtest'; then
             echo "::error::El APK contiene código de depuración o de pruebas: no se publica."
             exit 1
@@ -163,6 +181,10 @@ jobs:
             echo "::error::El APK está firmado con otro certificado ($got). No se publica."; exit 1
           fi
           echo "APK comprobado: v2+v3, certificado $got"
+          if [[ "$apk" == *fdroid* ]] && "$bt/aapt2" dump permissions "$apk" | grep -q REQUEST_INSTALL_PACKAGES; then
+            echo "::error::El APK de F-Droid no debe pedir instalar paquetes."; exit 1
+          fi
+          done
 
       - name: Preparar ficheros de la publicación
         env:
@@ -171,7 +193,10 @@ jobs:
         run: |
           mkdir -p out
           apk="${{ steps.version.outputs.apk }}"
-          cp app/build/outputs/apk/release/app-release.apk "out/$apk"
+          cp app/build/outputs/apk/github/release/app-github-release.apk "out/$apk"
+          if [ -f app/build/outputs/apk/fdroid/release/app-fdroid-release.apk ]; then
+            cp app/build/outputs/apk/fdroid/release/app-fdroid-release.apk "out/${apk%.apk}-fdroid.apk"
+          fi
           sha=$(sha256sum "out/$apk" | cut -d' ' -f1)
           # Notas: la sección de la versión en NOVEDADES.md ("## 0.4.0") o, si no hay, "## Próxima versión".
           section() { awk -v h="## $1" '$0==h{f=1;next} /^## /{f=0} f' NOVEDADES.md; }

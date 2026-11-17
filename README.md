@@ -77,10 +77,10 @@ contactos ni almacenamiento. Explicación detallada en la [web](https://flowmati
 Requiere JDK 17 y el Android SDK (API 36).
 
 ```bash
-./gradlew testDebugUnitTest assembleDebug
+./gradlew testGithubDebugUnitTest assembleGithubDebug assembleFdroidDebug
 ```
 
-APK de depuración: `app/build/outputs/apk/debug/app-debug.apk`. Pruebas automáticas y herramientas
+APK de depuración: `app/build/outputs/apk/github/debug/app-github-debug.apk` (variante `fdroid`, sin actualizador propio: `apk/fdroid/debug/`). Pruebas automáticas y herramientas
 de medición: [docs/PRUEBAS.md](docs/PRUEBAS.md).
 
 ### Versiones
