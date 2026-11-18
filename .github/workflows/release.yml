@@ -173,7 +173,13 @@ jobs:
           out=$("$bt/apksigner" verify -v --print-certs "$apk")
           echo "$out" | grep -q "Verified using v2 scheme (APK Signature Scheme v2): true" || { echo "::error::Sin firma v2"; exit 1; }
           echo "$out" | grep -q "Verified using v3 scheme (APK Signature Scheme v3): true" || { echo "::error::Sin firma v3"; exit 1; }
-          got=$(echo "$out" | grep -m1 "Signer #1 certificate SHA-256 digest" | awk '{print $NF}')
+          # La huella del certificado (64 hex), sea cual sea el formato de la línea en cada versión de apksigner.
+          got=$(echo "$out" | grep -i "certificate SHA-256 digest" | grep -m1 -oiE '[0-9a-f]{64}' | tr 'A-F' 'a-f' || true)
+          if [ -z "$got" ]; then
+            echo "::error::No se pudo leer la huella del certificado. Salida de apksigner:"
+            echo "$out" | grep -iE "signer|digest|verified" || echo "$out" | head -40
+            exit 1
+          fi
           if [ -z "$CERT_SHA256" ]; then
             echo "::error::Falta la variable del repositorio CERT_SHA256 (huella del certificado de firma)."; exit 1
           fi
