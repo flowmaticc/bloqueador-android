@@ -136,6 +136,12 @@ android {
         compose = true
         buildConfig = true
     }
+    // Sin el bloque DEPENDENCY_INFO en la firma: es la lista de librerías cifrada para Google, que nadie
+    // más puede leer. F-Droid e IzzyOnDroid piden quitarlo.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
     testOptions {
         // android.util.Log y similares devuelven valores por defecto en los tests de la JVM.
         unitTests.isReturnDefaultValues = true

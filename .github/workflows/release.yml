@@ -186,6 +186,21 @@ jobs:
           if [ "$got" != "$(echo "$CERT_SHA256" | tr 'A-F' 'a-f' | tr -d ': ')" ]; then
             echo "::error::El APK está firmado con otro certificado ($got). No se publica."; exit 1
           fi
+          # Sin el bloque DEPENDENCY_INFO (0x504b4453) en la firma: F-Droid e IzzyOnDroid lo rechazan.
+          if python3 - "$apk" <<'PY'
+          import struct, sys
+          d = open(sys.argv[1], "rb").read()
+          e = d.rfind(b"PK\x05\x06"); cd = struct.unpack("<I", d[e + 16:e + 20])[0]
+          size = struct.unpack("<Q", d[cd - 24:cd - 16])[0]; p = cd - size
+          while p < cd - 24:
+              n, i = struct.unpack("<QI", d[p:p + 12])
+              if i == 0x504b4453: sys.exit(0)
+              p += 8 + n
+          sys.exit(1)
+          PY
+          then
+            echo "::error::El APK lleva el bloque DEPENDENCY_INFO (dependenciesInfo en build.gradle.kts)."; exit 1
+          fi
           echo "APK comprobado: v2+v3, certificado $got"
           if [[ "$apk" == *fdroid* ]] && "$bt/aapt2" dump permissions "$apk" | grep -q REQUEST_INSTALL_PACKAGES; then
             echo "::error::El APK de F-Droid no debe pedir instalar paquetes."; exit 1
