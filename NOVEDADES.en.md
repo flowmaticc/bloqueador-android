@@ -5,7 +5,13 @@
 
 ## Next version
 
-- No changes yet since 0.4.0.
+- No changes yet since 0.4.1.
+
+## 0.4.1
+
+- The APK no longer carries the encrypted list of libraries that Android Studio adds for Google
+  (nobody else can read it). F-Droid and IzzyOnDroid ask for this, and Garbillo will be available there soon.
+- No other changes since 0.4.0.
 
 ## 0.4.0
 

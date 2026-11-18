@@ -2,7 +2,13 @@
 
 ## Próxima versión
 
-- Sin cambios todavía respecto a la 0.4.0.
+- Sin cambios todavía respecto a la 0.4.1.
+
+## 0.4.1
+
+- El APK ya no lleva la lista de librerías cifrada que Android Studio añade para Google (nadie más
+  puede leerla). Lo piden F-Droid e IzzyOnDroid, donde Garbillo estará disponible pronto.
+- Sin otros cambios respecto a la 0.4.0.
 
 ## 0.4.0
 
