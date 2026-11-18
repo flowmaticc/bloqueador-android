@@ -5,8 +5,10 @@ Bloqueador de publicidad, rastreadores y **sitios peligrosos** para **Android**,
 
 *Garbillo: la criba de esparto con la que se limpiaba el grano. Deja pasar lo bueno y retiene lo demás.*
 
+[![Descargar APK](https://img.shields.io/github/v/release/flowmaticc/bloqueador-android?label=Descargar%20APK&logo=github&style=for-the-badge&color=caff33&labelColor=24292f)](https://github.com/flowmaticc/bloqueador-android/releases/latest)
+[![Añadir a Obtainium](https://img.shields.io/badge/Obtainium-A%C3%B1adir-6438B5?style=for-the-badge)](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22app.bloqueador%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fflowmaticc%2Fbloqueador-android%22%2C%22author%22%3A%22flowmaticc%22%2C%22name%22%3A%22Garbillo%22%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Afalse%2C%5C%22apkFilterRegEx%5C%22%3A%5C%22fdroid%5C%22%2C%5C%22invertAPKFilter%5C%22%3Atrue%7D%22%7D)
+
 🌐 **Web:** [flowmaticc.github.io/utilities/bloqueador-android](https://flowmaticc.github.io/utilities/bloqueador-android/)
-· 📥 **Descarga:** [última versión estable](https://github.com/flowmaticc/bloqueador-android/releases/latest)
 · 🔒 [Política de privacidad](https://flowmaticc.github.io/utilities/bloqueador-android/privacidad/)
 
 ## Cómo funciona
@@ -41,7 +43,8 @@ Para los huecos de anuncios dentro de las webs, combínalo con Brave o Firefox +
 
 ## Instalar
 
-1. Descarga el APK de la [última versión estable](https://github.com/flowmaticc/bloqueador-android/releases/latest).
+1. Descarga `bloqueador-X.Y.Z.apk` de la [última versión estable](https://github.com/flowmaticc/bloqueador-android/releases/latest).
+   El que termina en `-fdroid.apk` es para tiendas como F-Droid: no se actualiza solo.
 2. Permite la instalación desde tu navegador o gestor de archivos.
 3. Si Play Protect avisa de "app desconocida", pulsa **Más detalles → Instalar de todas formas**
    (la app no está en Google Play; el código es este).
@@ -50,9 +53,9 @@ Para los huecos de anuncios dentro de las webs, combínalo con Brave o Firefox +
 Requiere Android 8.0 o superior.
 
 También puedes instalarla y recibir las actualizaciones con
-[Obtainium](https://github.com/ImranR98/Obtainium): añade
-`https://github.com/flowmaticc/bloqueador-android` como app
-([enlace directo](obtainium://add/https://github.com/flowmaticc/bloqueador-android)).
+[Obtainium](https://github.com/ImranR98/Obtainium): [añádela ya configurada](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22app.bloqueador%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fflowmaticc%2Fbloqueador-android%22%2C%22author%22%3A%22flowmaticc%22%2C%22name%22%3A%22Garbillo%22%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Afalse%2C%5C%22apkFilterRegEx%5C%22%3A%5C%22fdroid%5C%22%2C%5C%22invertAPKFilter%5C%22%3Atrue%7D%22%7D)
+(solo versiones estables y sin el APK `-fdroid`), o añade a mano
+`https://github.com/flowmaticc/bloqueador-android` y pon `fdroid` en el filtro de APK invertido.
 
 **Comprueba que el APK es auténtico.** Todas las versiones van firmadas con el mismo certificado. Su
 huella SHA-256 es:

@@ -232,8 +232,16 @@ jobs:
               [ -n "$(section "$f" "$base")" ] || { echo "::error::Falta la sección '## $base' en $f"; exit 1; }
             done
           fi
-          # En GitHub, las dos: primero español y debajo inglés.
-          printf '%s\n\n---\n\n**English**\n\n%s\n' "$notes" "$notes_en" > out/notas.md
+          # En GitHub, las dos: primero español y debajo inglés. Encima, qué APK descargar y Obtainium
+          # (ya configurado: solo estables y sin el APK -fdroid).
+          obtainium='https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22app.bloqueador%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fflowmaticc%2Fbloqueador-android%22%2C%22author%22%3A%22flowmaticc%22%2C%22name%22%3A%22Garbillo%22%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Afalse%2C%5C%22apkFilterRegEx%5C%22%3A%5C%22fdroid%5C%22%2C%5C%22invertAPKFilter%5C%22%3Atrue%7D%22%7D'
+          {
+            printf '📥 **`%s`** · [Obtainium](%s)\n\n' "$apk" "$obtainium"
+            if [ -f "out/${apk%.apk}-fdroid.apk" ]; then
+              printf '_`%s`: sin actualizador, para tiendas como F-Droid · no updater, for stores like F-Droid._\n\n' "${apk%.apk}-fdroid.apk"
+            fi
+            printf '%s\n\n---\n\n**English**\n\n%s\n' "$notes" "$notes_en"
+          } > out/notas.md
           jq -n \
             --argjson versionCode "${{ steps.version.outputs.code }}" \
             --arg versionName "${{ steps.version.outputs.name }}" \
