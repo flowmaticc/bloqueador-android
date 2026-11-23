@@ -79,23 +79,47 @@ class DnsForwarder(
 
     @Volatile
     private var socket: DatagramSocket? = null
+    @Volatile
+    private var running = false
+    /** Último intento de abrir el socket (para no reintentar en cada consulta si protect() falla). */
+    @Volatile
+    private var openAttemptAt = 0L
     private var receiver: Thread? = null
     private var tcpWorker: ExecutorService? = null
 
     override fun start() {
+        running = true
         tcpWorker = Executors.newSingleThreadExecutor { Thread(it, "dns-tcp") }
         openSocket()
     }
 
-    /** Abre el socket de reenvío (protegido: sale por la red real) y su hilo receptor. */
-    private fun openSocket() {
-        val s = DatagramSocket()
-        if (!protect(s)) Log.w(TAG, "No se pudo proteger el socket de reenvío")
+    /**
+     * Abre el socket de reenvío (protegido: sale por la red real) y su hilo receptor. Si Android no
+     * deja protegerlo, se cierra sin usarlo: un socket sin proteger podría volver a entrar al túnel
+     * (bucle de consultas). Queda [socket] a null y [forward] vuelve a intentarlo más tarde.
+     */
+    private fun openSocket(): Boolean {
+        openAttemptAt = System.currentTimeMillis()
+        val s = try {
+            DatagramSocket()
+        } catch (e: IOException) {
+            Log.w(TAG, "No se pudo abrir el socket de reenvío: ${e.message}")
+            socket = null
+            return false
+        }
+        if (!protect(s)) {
+            s.close()
+            socket = null
+            Log.w(TAG, "No se pudo proteger el socket de reenvío: no se usa")
+            return false
+        }
         socket = s
         receiver = Thread({ receiveLoop(s) }, "dns-forwarder").also { it.start() }
+        return true
     }
 
     override fun stop() {
+        running = false
         socket?.close() // desbloquea receive() con una excepción y el hilo termina
         socket = null
         receiver = null
@@ -110,7 +134,7 @@ class DnsForwarder(
      * a quien preguntó (paquete, o null si no se sabe) para el cupo por app.
      */
     override fun forward(request: UdpPacket, domain: String, app: String?) {
-        if (socket == null) return
+        if (!running) return
         val servers = upstream()
         if (servers.isEmpty()) return
         val now = System.currentTimeMillis()
@@ -130,6 +154,12 @@ class DnsForwarder(
             // El preferido pudo caerse solo un rato: se vuelve a probar de vez en cuando.
             serverShift.set(0)
             unanswered.set(0)
+        }
+        if (socket == null && now - openAttemptAt >= REOPEN_INTERVAL_MS) openSocket()
+        if (socket == null) {
+            // Sin socket protegido no se envía nada: SERVFAIL para que el cliente no espere en vano.
+            reply(IpPacket.buildUdpReply(request, DnsMessage.buildErrorResponse(request.payload(), DnsMessage.RCODE_SERVFAIL)))
+            return
         }
         if (pending.size > CLEANUP_THRESHOLD || unanswered.get() >= FAILOVER_AFTER) expire(now, servers.size)
         val key = app ?: UNKNOWN_APP
@@ -198,7 +228,8 @@ class DnsForwarder(
         val full = try {
             Socket().use { sock ->
                 sock.bind(null) // protect() necesita el socket ya creado en el sistema (ver DotResolver)
-                if (!protectTcp(sock)) Log.w(TAG, "No se pudo proteger el socket TCP")
+                // Sin proteger, la conexión podría entrar al túnel: no se conecta y se entrega la truncada.
+                if (!protectTcp(sock)) throw IOException("no se pudo proteger el socket TCP")
                 sock.soTimeout = TCP_TIMEOUT_MS
                 sock.connect(InetSocketAddress(p.server, port), TCP_TIMEOUT_MS)
                 val out = DataOutputStream(sock.getOutputStream())
@@ -279,6 +310,7 @@ class DnsForwarder(
         private const val FAILOVER_SILENCE_MS = 2_500L
         internal const val MAX_PENDING = 1024
         private const val PRIMARY_RETRY_MS = 5 * 60_000L
+        private const val REOPEN_INTERVAL_MS = 1_000L
         internal const val SILENT_ALERT_MS = 8_000L
         private const val RECENT_MS = 30_000L
 

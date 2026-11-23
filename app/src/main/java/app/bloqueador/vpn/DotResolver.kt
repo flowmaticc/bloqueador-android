@@ -150,7 +150,8 @@ class DotResolver(
                 // protect() necesita que el socket ya exista en el sistema: un Socket() de Java no lo
                 // crea hasta enlazarlo o conectarlo. Se enlaza antes para que la conexión no entre al túnel.
                 raw.bind(null)
-                if (!protect(raw)) Log.w(TAG, "No se pudo proteger el socket TLS")
+                // Sin proteger, la conexión podría entrar al túnel: se descarta sin conectar.
+                if (!protect(raw)) throw IOException("no se pudo proteger el socket TLS")
                 raw.connect(InetSocketAddress(server, port), CONNECT_TIMEOUT_MS)
                 val tls = sslFactory.createSocket(raw, hostname, port, true) as SSLSocket
                 tls.sslParameters = tls.sslParameters.apply {

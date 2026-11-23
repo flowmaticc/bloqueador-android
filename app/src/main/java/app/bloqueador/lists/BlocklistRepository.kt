@@ -246,6 +246,7 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
 
     private suspend fun downloadLocked(source: ListSource): Boolean = withContext(Dispatchers.IO) {
         val target = fileFor(source)
+        SafeReplace.recover(target)
         val tmp = File.createTempFile("${source.id}.", ".tmp", dir) // nombre único por descarga
         val etagKey = "etag_${source.id}"
         val countKey = "count_${source.id}"
@@ -274,6 +275,9 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
                                 if (total > MAX_LIST_BYTES) throw IOException(appContext.getString(R.string.list_err_too_big, source.name()))
                                 out.write(buf, 0, n)
                             }
+                            // Descarga cortada: no se valida ni sustituye nada con un archivo incompleto.
+                            val expected = conn.contentLengthLong
+                            if (expected >= 0 && total != expected) throw IOException(appContext.getString(R.string.list_err_save, source.name()))
                         }
                     }
                     val newCount = tmp.bufferedReader().useLines { BlocklistParser.parse(it).ruleCount }
@@ -281,9 +285,11 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
                     if (newCount < MIN_RULES || newCount < oldCount / 2) {
                         throw IOException(appContext.getString(R.string.list_err_discarded, source.name(), newCount, oldCount))
                     }
-                    if (!tmp.renameTo(target)) {
-                        target.delete()
-                        if (!tmp.renameTo(target)) throw IOException(appContext.getString(R.string.list_err_save, source.name()))
+                    // Nunca se borra la lista vigente antes de tener la nueva en su sitio.
+                    try {
+                        SafeReplace.replace(tmp, target)
+                    } catch (e: IOException) {
+                        throw IOException(appContext.getString(R.string.list_err_save, source.name()), e)
                     }
                     prefs.edit()
                         .putString(etagKey, conn.getHeaderField("ETag"))
