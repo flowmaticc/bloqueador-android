@@ -40,4 +40,14 @@ class ProtectionStateTest {
         assertTrue(p.warning)
         org.junit.Assert.assertEquals(app.bloqueador.UiText.res(app.bloqueador.R.string.state_no_internet), p.title)
     }
+
+    @Test
+    fun `DNS privado fijo y bloqueado por las listas avisa de que no hay internet, no de que se salta el filtro`() {
+        val bypass = protectionOf(running, rules = 1000, dnsSilent = false, privateDnsFixed = true)
+        val blocked = protectionOf(running, rules = 1000, dnsSilent = false, privateDnsFixed = true, privateDnsBlocked = true)
+        assertEquals(app.bloqueador.UiText.res(app.bloqueador.R.string.state_no_effect_text), bypass.detail)
+        assertEquals(app.bloqueador.UiText.res(app.bloqueador.R.string.state_private_dns_blocked_text), blocked.detail)
+        assertEquals(app.bloqueador.UiText.res(app.bloqueador.R.string.state_no_internet), blocked.title)
+        assertTrue(blocked.warning)
+    }
 }

@@ -59,6 +59,14 @@ class AppSettings(context: Context) {
         get() = stringSet("included_apps")
         set(v) = prefs.edit().putStringSet("included_apps", v).apply()
 
+    /**
+     * Apps que no deben tener internet: Garbillo no responde a sus consultas DNS (Android 10+, que es
+     * cuando se puede saber qué app pregunta). Siempre pasan por el túnel, sea cual sea la estrategia.
+     */
+    var noInternetApps: Set<String>
+        get() = stringSet("no_internet_apps")
+        set(v) = prefs.edit().putStringSet("no_internet_apps", v).apply()
+
     var mode: BlockMode
         get() = BlockMode.entries.firstOrNull { it.name == prefs.getString("mode", null) } ?: BlockMode.BALANCED
         set(v) = prefs.edit().putString("mode", v.name).apply()

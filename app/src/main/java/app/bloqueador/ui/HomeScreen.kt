@@ -91,6 +91,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
     var confirmMobileData by remember { mutableStateOf(false) }
     // Se vuelve a leer al volver de los ajustes de Android (el usuario puede haberlo cambiado).
     var privateDns by remember { mutableStateOf(privateDnsMode(context)) }
+    var privateDnsHost by remember { mutableStateOf(privateDnsHost(context)) }
     var lockdown by remember { mutableStateOf(app.settings.vpnLockdown) }
     // Solo mientras la pantalla está a la vista: en segundo plano no se despierta la CPU para nada.
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -104,6 +105,7 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
                 dnsSilent = app.dnsUnresponsive?.invoke() == true
                 waitingForWifi = !DownloadPolicy.automaticAllowed(context)
                 privateDns = privateDnsMode(context)
+                privateDnsHost = privateDnsHost(context)
                 app.checkLockdown?.invoke()
                 lockdown = app.settings.vpnLockdown
                 lastUpdated = app.repository.lastUpdated // la descarga inicial la hace el servicio
@@ -113,7 +115,11 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
     }
 
     val running = state is VpnState.Running || state == VpnState.Starting
-    val protection = protectionOf(state, rules, dnsSilent, privateDns == "hostname", waitingForWifi, lockdown)
+    // Si las listas bloquean el propio DNS privado (p. ej. la capa anti-evasión bloquea dns.google),
+    // Android no puede usarlo y el móvil se queda sin internet, en vez de saltarse el filtro.
+    val privateDnsBlocked = privateDns == "hostname" && rules > 0 &&
+        privateDnsHost?.let { app.engine.peek(it) != null } == true
+    val protection = protectionOf(state, rules, dnsSilent, privateDns == "hostname", waitingForWifi, lockdown, privateDnsBlocked)
 
     Column(
         Modifier
@@ -169,7 +175,11 @@ fun HomeScreen(onOpenSettings: () -> Unit, onOpenHistory: () -> Unit) {
                 Column(Modifier.padding(16.dp)) {
                     Text(stringResource(R.string.home_private_dns_title), style = MaterialTheme.typography.titleMedium)
                     Text(
-                        stringResource(R.string.home_private_dns_text),
+                        if (privateDnsBlocked) {
+                            stringResource(R.string.home_private_dns_blocked_text, privateDnsHost.orEmpty())
+                        } else {
+                            stringResource(R.string.home_private_dns_text)
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -274,6 +284,7 @@ internal fun protectionOf(
     privateDnsFixed: Boolean,
     waitingForWifi: Boolean = false,
     lockdown: Boolean = false,
+    privateDnsBlocked: Boolean = false,
 ): Protection =
     when (state) {
         VpnState.Stopped -> Protection(R.string.state_off, R.string.state_off_text)
@@ -282,6 +293,8 @@ internal fun protectionOf(
         is VpnState.Running -> when {
             state.loadingList -> Protection(R.string.state_starting, R.string.state_loading)
             lockdown -> Protection(R.string.state_no_internet, R.string.state_no_internet_text, warning = true)
+            privateDnsFixed && privateDnsBlocked ->
+                Protection(R.string.state_no_internet, R.string.state_private_dns_blocked_text, warning = true)
             privateDnsFixed -> Protection(R.string.state_no_effect, R.string.state_no_effect_text, warning = true)
             rules == 0 && waitingForWifi -> Protection(R.string.state_waiting_wifi, R.string.state_waiting_wifi_text, warning = true)
             rules == 0 -> Protection(R.string.state_incomplete, R.string.state_incomplete_text, warning = true)
@@ -293,3 +306,11 @@ internal fun protectionOf(
 /** "off", "opportunistic" (Automático) o "hostname" (proveedor fijo: se salta el filtro). */
 private fun privateDnsMode(context: Context): String? =
     if (Build.VERSION.SDK_INT >= 28) Settings.Global.getString(context.contentResolver, "private_dns_mode") else null
+
+/** Nombre del proveedor de DNS privado fijo (p. ej. "dns.google"), en minúsculas, o null. */
+private fun privateDnsHost(context: Context): String? =
+    if (Build.VERSION.SDK_INT >= 28) {
+        Settings.Global.getString(context.contentResolver, "private_dns_specifier")?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
+    } else {
+        null
+    }

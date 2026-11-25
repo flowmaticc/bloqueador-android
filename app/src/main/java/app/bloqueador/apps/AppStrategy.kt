@@ -28,19 +28,22 @@ sealed interface TunnelApps {
  * - Los paquetes que ya no están instalados se ignoran.
  * - Si "solo las que elija" se queda sin ninguna app instalada, se filtra todo: es preferible
  *   proteger de más que dejar el dispositivo sin protección sin avisar.
+ * - Las apps "sin internet" ([noInternet]) siempre pasan por el túnel: si no, sus consultas no
+ *   llegarían a Garbillo y seguirían conectándose.
  */
 fun computeTunnelApps(
     strategy: AppStrategy,
     excluded: Set<String>,
     included: Set<String>,
     self: String,
+    noInternet: Set<String> = emptySet(),
     isInstalled: (String) -> Boolean,
 ): TunnelApps = when (strategy) {
     AppStrategy.ALL -> TunnelApps.Disallowed(listOf(self))
     AppStrategy.ALL_EXCEPT ->
-        TunnelApps.Disallowed(listOf(self) + excluded.filter { it != self && isInstalled(it) }.sorted())
+        TunnelApps.Disallowed(listOf(self) + excluded.filter { it != self && it !in noInternet && isInstalled(it) }.sorted())
     AppStrategy.ONLY -> {
-        val apps = included.filter { it != self && isInstalled(it) }.sorted()
+        val apps = (included + noInternet).filter { it != self && isInstalled(it) }.distinct().sorted()
         if (apps.isEmpty()) TunnelApps.Disallowed(listOf(self)) else TunnelApps.Allowed(apps)
     }
 }

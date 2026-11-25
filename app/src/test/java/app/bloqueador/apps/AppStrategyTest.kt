@@ -66,4 +66,17 @@ class AppStrategyTest {
         assertNull(AppSettings.cleanDomain(""))
         assertNull(AppSettings.cleanDomain("a..com"))
     }
+
+    @Test
+    fun `las apps sin internet siempre pasan por el tunel`() {
+        val installed: (String) -> Boolean = { true }
+        val except = computeTunnelApps(AppStrategy.ALL_EXCEPT, setOf("banco", "juego"), emptySet(), "yo", isInstalled = installed, noInternet = setOf("juego"))
+        assertEquals(TunnelApps.Disallowed(listOf("yo", "banco")), except)
+        val only = computeTunnelApps(AppStrategy.ONLY, emptySet(), setOf("chrome"), "yo", isInstalled = installed, noInternet = setOf("juego", "chrome"))
+        assertEquals(TunnelApps.Allowed(listOf("chrome", "juego")), only)
+        val all = computeTunnelApps(AppStrategy.ALL, emptySet(), emptySet(), "yo", isInstalled = installed, noInternet = setOf("juego"))
+        assertEquals(TunnelApps.Disallowed(listOf("yo")), all)
+        // La propia app nunca, aunque se marque.
+        assertEquals(TunnelApps.Allowed(listOf("juego")), computeTunnelApps(AppStrategy.ONLY, emptySet(), setOf("juego"), "yo", isInstalled = installed, noInternet = setOf("yo")))
+    }
 }

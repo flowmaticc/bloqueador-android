@@ -111,6 +111,17 @@
         <item quantity="one">Solo %d app</item>
         <item quantity="other">Solo %d apps</item>
     </plurals>
+    <string name="no_internet_title">Apps sin internet</string>
+    <string name="no_internet_none">Ninguna app bloqueada</string>
+    <plurals name="no_internet_count">
+        <item quantity="one">%d app sin internet</item>
+        <item quantity="other">%d apps sin internet</item>
+    </plurals>
+    <string name="no_internet_help">Garbillo no responde a sus consultas DNS, así que la gran mayoría se quedan sin conexión. Una app que se conecte directamente a una dirección IP podría seguir teniendo internet.</string>
+    <string name="no_internet_old_android">Necesita Android 10 o superior.</string>
+    <string name="no_internet_choose">Elegir apps</string>
+    <string name="no_internet_picker_text">Marca las apps que no deben conectarse a internet mientras Garbillo esté activo. Pasan siempre por el filtro, aunque las hayas excluido.</string>
+    <string name="no_internet_banking_note">Si las dejas sin internet, dejarán de funcionar.</string>
     <string name="time_just_now">hace un momento</string>
     <string name="mode_custom">Personalizado (base %1$s)</string>
     <string name="settings_applied">Configuración aplicada</string>
@@ -135,6 +146,7 @@
     <string name="home_open_vpn_settings">Abrir ajustes de VPN</string>
     <string name="home_private_dns_title">El DNS privado está activado</string>
     <string name="home_private_dns_text">Con un proveedor de DNS privado fijo, Android se salta el filtro. Ve a Ajustes → Redes → DNS privado y elige \"Automático\" o \"Desactivado\".</string>
+    <string name="home_private_dns_blocked_text">Tu DNS privado (%1$s) está en las listas de bloqueo, así que Android no puede usarlo y el móvil se queda sin internet. Ve a Ajustes → Redes → DNS privado y elige \"Automático\" o \"Desactivado\".</string>
     <string name="home_since">Desde que se activó</string>
     <string name="home_queries">Consultas DNS: %1$,d</string>
     <string name="home_blocked">Bloqueadas: %1$,d</string>
@@ -166,6 +178,7 @@
     <string name="state_no_internet_text">Un ajuste de Android corta la conexión (mira el aviso de abajo)</string>
     <string name="state_no_effect">Sin efecto</string>
     <string name="state_no_effect_text">El DNS privado de Android se salta el filtro (mira el aviso de abajo)</string>
+    <string name="state_private_dns_blocked_text">El DNS privado de Android está bloqueado y corta la conexión (mira el aviso de abajo)</string>
     <string name="state_waiting_wifi">Esperando a una wifi</string>
     <string name="state_waiting_wifi_text">Las listas se descargarán en cuanto te conectes a una wifi sin límite de datos. Si no quieres esperar, pulsa \"Actualizar ahora\" (usará la red actual).</string>
     <string name="state_incomplete">Protección incompleta</string>

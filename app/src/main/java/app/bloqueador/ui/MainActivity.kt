@@ -1,6 +1,7 @@
 package app.bloqueador.ui
 
 import app.bloqueador.R
+import android.widget.Toast
 import androidx.compose.ui.res.stringResource
 import android.net.VpnService
 import android.os.Bundle
@@ -72,7 +73,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Screen { ONBOARDING, HOME, SETTINGS, STRATEGY, APPS, HISTORY }
+private enum class Screen { ONBOARDING, HOME, SETTINGS, STRATEGY, APPS, NO_INTERNET, HISTORY }
 
 /** Navegación mínima entre pantallas (sin librería: son cinco pantallas en línea). */
 @Composable
@@ -134,6 +135,26 @@ private fun AppRoot() {
                     pending = settings.strategy
                     screen = Screen.APPS
                 },
+                onEditNoInternet = { screen = Screen.NO_INTERNET },
+            )
+        }
+
+        Screen.NO_INTERNET -> {
+            BackHandler { screen = Screen.SETTINGS }
+            AppPickerScreen(
+                strategy = AppStrategy.ALL_EXCEPT,
+                initial = settings.noInternetApps,
+                preselectSensitive = false,
+                onBack = { screen = Screen.SETTINGS },
+                onSave = { selection ->
+                    settings.noInternetApps = selection
+                    if (BloqueadorApp.instance.vpnState.value is VpnState.Running) DnsVpnService.reloadApps(context)
+                    Toast.makeText(context, context.getString(R.string.settings_applied), Toast.LENGTH_SHORT).show()
+                    screen = Screen.SETTINGS
+                },
+                title = stringResource(R.string.no_internet_title),
+                text = stringResource(R.string.no_internet_picker_text),
+                sensitiveNote = stringResource(R.string.no_internet_banking_note),
             )
         }
 

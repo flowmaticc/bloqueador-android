@@ -148,6 +148,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onChangeStrategy: () -> Unit,
     onEditApps: () -> Unit,
+    onEditNoInternet: () -> Unit = {},
 ) {
     // La categoría abierta la guarda quien llama: así, al volver de elegir apps, sigue abierta.
     BackHandler(enabled = section != null) { onOpenSection(null) }
@@ -155,7 +156,7 @@ fun SettingsScreen(
     if (section == null) {
         SettingsHome(onBack = onBack, onOpen = onOpenSection)
     } else {
-        SectionScreen(section, onBack = { onOpenSection(null) }, onChangeStrategy, onEditApps)
+        SectionScreen(section, onBack = { onOpenSection(null) }, onChangeStrategy, onEditApps, onEditNoInternet)
     }
 }
 
@@ -281,6 +282,7 @@ private fun SectionScreen(
     onBack: () -> Unit,
     onChangeStrategy: () -> Unit,
     onEditApps: () -> Unit,
+    onEditNoInternet: () -> Unit,
 ) {
     val context = LocalContext.current
     val app = BloqueadorApp.instance
@@ -338,7 +340,10 @@ private fun SectionScreen(
             SettingsSection.MODE -> ModeSection { revert -> applyLists(download = true, revert) }
             SettingsSection.SECURITY -> SecuritySection { revert -> applyLists(download = true, revert) }
             SettingsSection.LAYERS -> LayersSection { on, revert -> applyLists(download = on, revert.takeIf { on }) }
-            SettingsSection.APPS -> AppsSection(onChangeStrategy, onEditApps)
+            SettingsSection.APPS -> {
+                AppsSection(onChangeStrategy, onEditApps)
+                NoInternetSection(onEditNoInternet)
+            }
             SettingsSection.RULES -> RulesSection { applyLists(download = false) }
             SettingsSection.ENCRYPTED_DNS -> EncryptedDnsSection()
             SettingsSection.LIST_UPDATES -> ListUpdatesSection()
@@ -514,6 +519,25 @@ private fun AppsSection(onChangeStrategy: () -> Unit, onEditApps: () -> Unit) {
                 summary = strategySummary(context, settings)
             }
         }) { Text(stringResource(R.string.apps_restore)) }
+    }
+}
+
+/** Apps que se quedan sin internet: Garbillo no responde a sus consultas DNS. */
+@Composable
+private fun NoInternetSection(onEdit: () -> Unit) {
+    val context = LocalContext.current
+    val count = BloqueadorApp.instance.settings.noInternetApps.size
+    SectionCard(stringResource(R.string.no_internet_title)) {
+        Text(
+            if (count == 0) stringResource(R.string.no_internet_none)
+            else context.resources.getQuantityString(R.plurals.no_internet_count, count, count),
+        )
+        Text(stringResource(R.string.no_internet_help), style = MaterialTheme.typography.bodySmall)
+        if (android.os.Build.VERSION.SDK_INT < 29) {
+            Text(stringResource(R.string.no_internet_old_android), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+        } else {
+            OutlinedButton(onClick = onEdit) { Text(stringResource(R.string.no_internet_choose)) }
+        }
     }
 }
 

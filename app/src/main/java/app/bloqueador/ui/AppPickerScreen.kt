@@ -59,6 +59,9 @@ fun AppPickerScreen(
     preselectSensitive: Boolean,
     onBack: (() -> Unit)?,
     onSave: (Set<String>) -> Unit,
+    title: String? = null,
+    text: String? = null,
+    sensitiveNote: String? = null,
 ) {
     val context = LocalContext.current
     var apps by remember { mutableStateOf<List<AppEntry>?>(null) }
@@ -89,9 +92,9 @@ fun AppPickerScreen(
             .safeDrawingPadding()
             .padding(horizontal = 16.dp),
     ) {
-        ScreenHeader(stringResource(if (excluding) R.string.picker_excluded_title else R.string.picker_included_title), onBack)
+        ScreenHeader(title ?: stringResource(if (excluding) R.string.picker_excluded_title else R.string.picker_included_title), onBack)
         Text(
-            stringResource(if (excluding) R.string.picker_excluded_text else R.string.picker_included_text),
+            text ?: stringResource(if (excluding) R.string.picker_excluded_text else R.string.picker_included_text),
             style = MaterialTheme.typography.bodyMedium,
         )
         OutlinedTextField(
@@ -127,7 +130,7 @@ fun AppPickerScreen(
                     item(key = "h-sensitive") {
                         SectionLabel(
                             stringResource(R.string.picker_banking),
-                            stringResource(if (excluding) R.string.picker_banking_exclude else R.string.picker_banking_include),
+                            sensitiveNote ?: stringResource(if (excluding) R.string.picker_banking_exclude else R.string.picker_banking_include),
                         )
                     }
                     items(sensitive, key = { it.packageName }) { app ->
