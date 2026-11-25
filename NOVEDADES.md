@@ -2,7 +2,23 @@
 
 ## Próxima versión
 
-- Sin cambios todavía respecto a la 0.4.1.
+- **Diagnóstico** (Ajustes → Diagnóstico): muestra si el filtro funciona de verdad (consultas
+  atendidas, listas cargadas, qué DNS se usa y por qué red sale) y tiene una prueba en vivo que
+  comprueba que una web normal se resuelve y un dominio de publicidad se bloquea.
+- **Apps sin internet** (Ajustes → Apps protegidas): elige apps que no deben conectarse. Garbillo no
+  responde a sus consultas, así que casi todas se quedan sin conexión (Android 10 o superior).
+- **Más difícil de saltar**: las apps que preguntan directamente a DNS públicos (Google, Cloudflare,
+  Quad9…) también pasan por el filtro, y su DNS cifrado se corta para que usen el del móvil.
+- **Listas más fiables**: una actualización fallida nunca borra la lista anterior, y si el autor reduce
+  una lista a propósito (como la de amenazas de HaGeZi) ya no se rechaza para siempre.
+- **WiFi y datos a la vez**: el DNS de salida es siempre el de la red que de verdad usa Android.
+- **Sin conexión gasta menos**: el DNS cifrado deja de reintentar sin parar cuando no hay red y vuelve
+  en cuanto la hay.
+- Si el DNS privado de Android apunta a un servicio que tus listas bloquean, la app avisa de que no
+  hay internet (antes decía que se saltaba el filtro).
+- Correcciones de una revisión de seguridad externa: no se usan conexiones que no se puedan proteger,
+  las descargas solo van por HTTPS, el actualizador conserva la versión anterior hasta verificar la
+  nueva y el IPv6 se entiende mejor.
 
 ## 0.4.1
 

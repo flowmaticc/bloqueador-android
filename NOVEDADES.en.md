@@ -5,7 +5,24 @@
 
 ## Next version
 
-- No changes yet since 0.4.1.
+- **Diagnostics** (Settings → Diagnostics): shows whether the filter really works (queries handled,
+  lists loaded, which DNS is in use and which network it goes out through) and has a live test that
+  checks that a normal site resolves and an ad domain is blocked.
+- **Apps without internet** (Settings → Protected apps): choose apps that must not connect. Garbillo
+  does not answer their queries, so almost all of them lose their connection (Android 10 or later).
+- **Harder to bypass**: apps that ask public DNS servers directly (Google, Cloudflare, Quad9…) also go
+  through the filter, and their encrypted DNS is cut so they use the phone's DNS.
+- **More reliable lists**: a failed update never deletes the previous list, and when the author shrinks
+  a list on purpose (like HaGeZi's threat list) it is no longer rejected forever.
+- **Wi-Fi and mobile data at the same time**: the outgoing DNS is always the one of the network Android
+  really uses.
+- **Uses less without a connection**: encrypted DNS stops retrying endlessly when there is no network
+  and comes back as soon as there is one.
+- If Android's private DNS points to a service your lists block, the app now warns that there is no
+  internet (it used to say the filter was bypassed).
+- Fixes from an external security review: connections that cannot be protected are not used,
+  downloads only go over HTTPS, the updater keeps the previous version until the new one is verified,
+  and IPv6 is handled better.
 
 ## 0.4.1
 
