@@ -76,6 +76,7 @@ enum class SettingsSection(@androidx.annotation.StringRes val title: Int, @andro
     LIST_UPDATES(R.string.sec_list_updates, R.string.group_operation),
     HISTORY(R.string.sec_history, R.string.group_operation),
     BATTERY(R.string.sec_battery, R.string.group_operation),
+    DIAGNOSTICS(R.string.sec_diagnostics, R.string.group_operation),
     LANGUAGE(R.string.sec_language, R.string.group_app),
     APP_UPDATES(R.string.sec_app_updates, R.string.group_app),
     ERROR_REPORTS(R.string.sec_error_reports, R.string.group_app),
@@ -118,6 +119,7 @@ fun settingsIndex(manufacturer: String?): List<SettingEntry> = buildList {
     add(SettingsSection.BATTERY, R.string.battery_card_title, R.string.idx_battery_kw)
     add(SettingsSection.BATTERY, R.string.idx_boot, R.string.idx_boot_kw)
     add(SettingsSection.BATTERY, R.string.idx_always_on, R.string.idx_always_on_kw)
+    add(SettingsSection.DIAGNOSTICS, R.string.sec_diagnostics, R.string.idx_diagnostics_kw)
     add(SettingsSection.LANGUAGE, R.string.sec_language, R.string.idx_language_kw)
     add(SettingsSection.ABOUT, R.string.idx_web, R.string.idx_web_kw)
     add(SettingsSection.APP_UPDATES, R.string.idx_channel, R.string.idx_channel_kw)
@@ -262,6 +264,7 @@ private fun sectionSummary(context: android.content.Context, s: SettingsSection,
         SettingsSection.HISTORY ->
             if (settings.historyEnabled) str(R.string.sum_history_on, settings.historyRetention.label.get(context)) else str(R.string.sum_off_m)
         SettingsSection.BATTERY -> str(R.string.sum_battery)
+        SettingsSection.DIAGNOSTICS -> str(R.string.sum_diagnostics)
         SettingsSection.LANGUAGE -> AppLanguage.current(context)?.let(AppLanguage::displayName)
             ?: str(R.string.sum_language_system, AppLanguage.displayName(java.util.Locale.getDefault().language))
         SettingsSection.APP_UPDATES -> str(R.string.sum_app_updates, settings.updateChannel.label.get(context), BuildConfig.VERSION_NAME)
@@ -349,6 +352,7 @@ private fun SectionScreen(
             SettingsSection.LIST_UPDATES -> ListUpdatesSection()
             SettingsSection.HISTORY -> HistorySection()
             SettingsSection.BATTERY -> BatterySection()
+            SettingsSection.DIAGNOSTICS -> DiagnosticsSection()
             SettingsSection.LANGUAGE -> LanguageSection()
             SettingsSection.APP_UPDATES -> AppUpdateSection()
             SettingsSection.ERROR_REPORTS -> ErrorReportsSection()

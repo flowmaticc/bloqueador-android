@@ -110,6 +110,33 @@ class DnsVpnService : VpnService() {
     }
     @Volatile private var tunnelSkipsPublicDns = false
 
+    /** Consultas de prueba del diagnóstico en vuelo, por puerto de origen (1-1023: ninguna app los usa). */
+    private val selfTests = java.util.concurrent.ConcurrentHashMap<Int, kotlinx.coroutines.CompletableDeferred<ByteArray>>()
+
+    /**
+     * Consulta [domain] como si fuera una app: el paquete entra por el mismo camino que los del túnel
+     * (filtro, reenvío, DNS cifrado) y la respuesta se recoge en [write] en lugar de ir al túnel.
+     */
+    private suspend fun selfTest(domain: String): SelfTestResult {
+        if (tunnel == null) return SelfTestResult.NotRunning
+        val port = (1..1023).shuffled().firstOrNull { !selfTests.containsKey(it) } ?: return SelfTestResult.Timeout
+        val waiting = kotlinx.coroutines.CompletableDeferred<ByteArray>()
+        selfTests[port] = waiting
+        try {
+            val query = SelfTest.query(domain, java.security.SecureRandom().nextInt(0x10000))
+            val packet = IpPacket.buildUdp(
+                4, java.net.InetAddress.getByName(TUN_V4).address, java.net.InetAddress.getByName(DNS_V4).address, port, 53, query,
+            )
+            val start = SystemClock.elapsedRealtime()
+            withContext(Dispatchers.IO) { handlePacket(packet, packet.size) }
+            val response = withTimeoutOrNull(SELF_TEST_TIMEOUT_MS) { waiting.await() } ?: return SelfTestResult.Timeout
+            val payload = IpPacket.parseUdp(response, response.size)?.payload() ?: return SelfTestResult.Failed(-1)
+            return SelfTest.interpret(payload, SystemClock.elapsedRealtime() - start)
+        } finally {
+            selfTests.remove(port)
+        }
+    }
+
     /** Apps sin internet (copia de los ajustes al crear el túnel; se lee en cada consulta). */
     @Volatile private var noInternetApps: Set<String> = emptySet()
 
@@ -187,6 +214,19 @@ class DnsVpnService : VpnService() {
         ).also { it.start() }
         forwarder = fwd
         up.onNetworkChanged = { fwd.networkChanged() }
+        app.diagnostics = {
+            val (kind, lastAnswer) = fwd.status()
+            DiagnosticsInfo(
+                network = up.networkKind(),
+                networkDns = up.networkDns(),
+                resolver = kind,
+                encryptedProvider = app.settings.encryptedDns?.hostname,
+                lastAnswerAt = lastAnswer,
+                publicDnsCaptured = tunnel != null && !tunnelSkipsPublicDns,
+                noInternetApps = noInternetApps.size,
+            )
+        }
+        app.selfTest = ::selfTest
         app.dnsUnresponsive = { fwd.isUnresponsive() }
         if (BuildConfig.DEBUG) {
             QueryLog.init(this)
@@ -426,7 +466,8 @@ class DnsVpnService : VpnService() {
         if (BuildConfig.DEBUG) QueryLog.query(owner.value, question.name, rule)
         // Nombres con caracteres raros (no son hosts reales): se filtran igual, pero no se anotan ni
         // se avisa de ellos, para no guardar ni mostrar lo que una app quiera colar ahí.
-        val annotate = question.isHostname
+        // Las consultas de prueba del diagnóstico no se anotan en el historial.
+        val annotate = question.isHostname && !(udp.sourcePort < 1024 && selfTests.containsKey(udp.sourcePort))
         if (rule != null) {
             // Se averigua la app antes de responder: tras la respuesta el socket puede cerrarse.
             if (annotate) record(question.name, rule, owner)
@@ -454,6 +495,12 @@ class DnsVpnService : VpnService() {
 
     /** Escribe en el túnel vigente (tras una recarga, las respuestas pendientes salen por el nuevo). */
     private fun write(packet: ByteArray) {
+        if (selfTests.isNotEmpty()) {
+            // ¿Respuesta a una consulta de prueba del diagnóstico? Se recoge y no va al túnel.
+            IpPacket.parseUdp(packet, packet.size)?.let { udp ->
+                if (udp.sourcePort == 53) selfTests[udp.destinationPort]?.let { it.complete(packet); return }
+            }
+        }
         val out = tunnel?.output ?: return
         try {
             synchronized(out) { out.write(packet) }
@@ -471,6 +518,10 @@ class DnsVpnService : VpnService() {
 
     private fun closeAll() {
         runCatching { contentResolver.unregisterContentObserver(privateDnsObserver) }
+        app.diagnostics = null
+        app.selfTest = null
+        selfTests.values.forEach { it.cancel() }
+        selfTests.clear()
         starting = false
         generation++
         app.dnsUnresponsive = null
@@ -537,6 +588,7 @@ class DnsVpnService : VpnService() {
         private const val LOCKDOWN_CHECK_MS = 30_000L
         private const val NOTIFICATION_ID = 1
 
+        private const val SELF_TEST_TIMEOUT_MS = 6_000L
         private const val TUN_V4 = "10.111.222.1"
         private const val DNS_V4 = "10.111.222.2"
         private const val TUN_V6 = "fd00:6c6f:6361:6c::1"

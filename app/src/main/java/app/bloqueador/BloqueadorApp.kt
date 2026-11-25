@@ -38,6 +38,14 @@ class BloqueadorApp : Application() {
     @Volatile
     var checkLockdown: (() -> Unit)? = null
 
+    /** Con el filtro activo: estado interno para la pantalla Diagnóstico. */
+    @Volatile
+    var diagnostics: (() -> app.bloqueador.vpn.DiagnosticsInfo)? = null
+
+    /** Con el filtro activo: consulta de prueba que recorre el filtro entero (pantalla Diagnóstico). */
+    @Volatile
+    var selfTest: (suspend (String) -> app.bloqueador.vpn.SelfTestResult)? = null
+
     fun setVpnState(state: VpnState) {
         _vpnState.value = state
     }

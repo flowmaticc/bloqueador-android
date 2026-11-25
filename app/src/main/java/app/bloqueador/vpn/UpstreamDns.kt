@@ -117,6 +117,21 @@ class UpstreamDns(context: Context) {
      */
     fun current(): List<InetAddress> = choose(tracker.dns())
 
+    /** Tipo de la red de salida (para el diagnóstico), o null si no hay ninguna. */
+    fun networkKind(): NetworkKind? {
+        val n = tracker.network ?: return null
+        val caps = runCatching { cm.getNetworkCapabilities(n) }.getOrNull() ?: return NetworkKind.OTHER
+        return when {
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> NetworkKind.WIFI
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> NetworkKind.CELLULAR
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> NetworkKind.ETHERNET
+            else -> NetworkKind.OTHER
+        }
+    }
+
+    /** Servidores DNS que anuncia la red de salida (sin el respaldo). */
+    fun networkDns(): List<String> = tracker.dns().mapNotNull { it.hostAddress }
+
     companion object {
         private const val TAG = "UpstreamDns"
 

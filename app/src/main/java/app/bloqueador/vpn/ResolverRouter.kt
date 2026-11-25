@@ -50,6 +50,16 @@ class ResolverRouter(
 
     override fun isUnresponsive(now: Long): Boolean = current().isUnresponsive(now)
 
+    /** Quién resuelve ahora y cuándo contestó por última vez (sin abrir conexiones nuevas). */
+    fun status(): Pair<ResolverKind, Long> {
+        val wanted = provider()
+        return when {
+            wanted == null -> ResolverKind.NETWORK to udp.lastAnswerAt
+            !networkValidated() -> ResolverKind.NETWORK_UNVALIDATED to udp.lastAnswerAt
+            else -> ResolverKind.ENCRYPTED to (dot?.takeIf { it.first == wanted }?.second?.lastAnswerAt ?: 0L)
+        }
+    }
+
     override fun networkChanged() {
         udp.networkChanged()
         dot?.second?.networkChanged()

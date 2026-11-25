@@ -249,7 +249,12 @@ class DnsForwarder(
         deliver(p, valid ?: truncated, viaTcp = valid != null)
     }
 
+    @Volatile
+    override var lastAnswerAt = 0L
+        private set
+
     private fun deliver(p: Pending, response: ByteArray, viaTcp: Boolean) {
+        lastAnswerAt = System.currentTimeMillis()
         DnsMessage.put16(response, 0, p.originalId)
         if (BuildConfig.DEBUG) {
             QueryLog.answer(p.domain, System.currentTimeMillis() - p.sentAt, response[3].toInt() and 0x0F, viaTcp)

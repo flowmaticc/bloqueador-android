@@ -20,6 +20,9 @@ interface DnsResolver {
     /** true si se pregunta pero nadie contesta desde hace un rato (para avisar en la pantalla principal). */
     fun isUnresponsive(now: Long = System.currentTimeMillis()): Boolean
 
+    /** Momento de la última respuesta recibida del servidor (0 = ninguna). Para el diagnóstico. */
+    val lastAnswerAt: Long get() = 0L
+
     /** La red de salida ha cambiado (para reintentar ya lo que estaba esperando a que hubiera red). */
     fun networkChanged() {}
 }

@@ -87,6 +87,8 @@ class DotResolver(
     @Volatile private var lastSentAt = 0L
     @Volatile private var waitingSince = 0L
     @Volatile private var lastCleanup = 0L
+    @Volatile override var lastAnswerAt = 0L
+        private set
 
     /** Sin red (o sin ningún servidor alcanzable) no se reintenta conectar hasta [retryAt]. */
     @Volatile private var retryAt = 0L
@@ -216,6 +218,7 @@ class DotResolver(
                 if (!DnsForwarder.sameQuestion(p.query, response)) continue
                 if (take(id) == null) continue
                 waitingSince = 0L
+                lastAnswerAt = System.currentTimeMillis()
                 DnsMessage.put16(response, 0, p.originalId)
                 reply(IpPacket.buildUdpReply(p.request, response))
             }

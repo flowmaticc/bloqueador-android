@@ -31,6 +31,11 @@ class FilterEngine(private val cacheSize: Int = 2048) {
     val threatsBlocked = AtomicLong()
     val cacheHits = AtomicLong()
 
+    /** Momento de la última consulta atendida (0 = ninguna desde que arrancó). */
+    @Volatile
+    var lastQueryAt = 0L
+        private set
+
     fun update(filters: Filters) {
         state = State(filters, cacheSize)
     }
@@ -40,6 +45,7 @@ class FilterEngine(private val cacheSize: Int = 2048) {
     /** Regla que bloquea [domain] (y cuenta la consulta), o null si se permite. */
     fun decide(domain: String): String? {
         queries.incrementAndGet()
+        lastQueryAt = System.currentTimeMillis()
         val s = state
         val cached = s.cache[domain]
         val rule = if (cached != null) {
