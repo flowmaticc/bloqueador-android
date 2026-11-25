@@ -167,7 +167,7 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.10.2")
     // org.json real para los tests (en Android viene con el sistema; en la JVM de tests no).
-    testImplementation("org.json:json:20240303")
+    testImplementation("org.json:json:20260814")
 }
 
 // Informe de cobertura frente a https://adblock.turtlecute.org (descarga las listas; desactivado
