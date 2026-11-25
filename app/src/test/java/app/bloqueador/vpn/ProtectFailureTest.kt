@@ -113,7 +113,9 @@ class ProtectFailureTest {
             .also { it.start(); cleanup.add(it::stop) }
 
         r.forward(request("a.example", 3), "a.example")
-        assertNull(replies.poll(1_500, TimeUnit.MILLISECONDS))
+        val reply = payloadOf(replies.poll(3, TimeUnit.SECONDS)!!)
+        assertEquals(DnsMessage.RCODE_SERVFAIL, reply[3].toInt() and 0x0F)
+        Thread.sleep(300)
         assertEquals("no se abrió ninguna conexión", 0, accepted.get())
     }
 }

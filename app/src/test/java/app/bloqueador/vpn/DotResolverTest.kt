@@ -90,8 +90,11 @@ class DotResolverTest {
 
     private fun nextReply(): UdpPacket? = replies.poll(5, TimeUnit.SECONDS)?.let { IpPacket.parseUdp(it, it.size) }
 
+    private var cleanup: () -> Unit = {}
+
     @After
     fun tearDown() {
+        cleanup()
         resolver?.stop()
         server?.close()
     }
@@ -111,10 +114,12 @@ class DotResolverTest {
     }
 
     @Test
-    fun `un certificado que no es del servicio se rechaza y no se entrega nada`() {
+    fun `un certificado que no es del servicio se rechaza y solo se entrega SERVFAIL`() {
         val r = start(startServer(), hostname = "otro.test")
         r.forward(request("banco.example", 7), "banco.example")
-        assertNull(replies.poll(2, TimeUnit.SECONDS))
+        val reply = nextReply()!!.payload()
+        assertEquals(DnsMessage.RCODE_SERVFAIL, DnsMessage.u16(reply, 2) and 0xF)
+        assertEquals("ninguna respuesta del servidor falso", 0, DnsMessage.u16(reply, 6))
     }
 
     @Test
@@ -130,7 +135,12 @@ class DotResolverTest {
 
     @Test
     fun `una app que inunda recibe SERVFAIL sin tocar la conexion`() {
-        val r = DotResolver("dot.test", listOf(InetAddress.getByName("127.0.0.2")), { true }, { replies.add(it) }, 1)
+        // Servidor que acepta la conexión y nunca contesta: las consultas se quedan en vuelo.
+        val silent = java.net.ServerSocket(0, 10, loopback)
+        val held = java.util.concurrent.CopyOnWriteArrayList<java.net.Socket>()
+        Thread { while (!silent.isClosed) runCatching { held.add(silent.accept()) }.onFailure { return@Thread } }.start()
+        cleanup = { silent.close(); held.forEach { runCatching { it.close() } } }
+        val r = DotResolver("dot.test", listOf(loopback), { true }, { replies.add(it) }, silent.localPort)
             .also { it.start(); resolver = it }
         repeat(DotResolver.MAX_PENDING_PER_APP) { r.forward(request("f$it.example", it), "f$it.example", "ruidosa") }
         r.forward(request("mas.example", 0x7777), "mas.example", "ruidosa")

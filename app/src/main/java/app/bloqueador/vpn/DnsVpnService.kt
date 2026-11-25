@@ -164,6 +164,7 @@ class DnsVpnService : VpnService() {
             createDot = { p -> DotResolver.forProvider(p, protect = { protect(it) }, reply = ::write) },
         ).also { it.start() }
         forwarder = fwd
+        up.onNetworkChanged = { fwd.networkChanged() }
         app.dnsUnresponsive = { fwd.isUnresponsive() }
         if (BuildConfig.DEBUG) {
             QueryLog.init(this)
@@ -233,7 +234,15 @@ class DnsVpnService : VpnService() {
             Log.e(TAG, "No se pudo crear el túnel", e)
             null
         } ?: return null
-        val pipe = Os.pipe()
+        // El pipe sirve para despertar al hilo lector al cerrar. Si no se puede crear (sin descriptores
+        // libres), se cierra el túnel recién abierto: quien llama lo trata como un fallo al crearlo.
+        val pipe = try {
+            Os.pipe()
+        } catch (e: Exception) {
+            Log.e(TAG, "No se pudo crear el pipe del túnel", e)
+            runCatching { pfd.close() }
+            return null
+        }
         val t = Tunnel(pfd, pipe[0], pipe[1])
         t.thread = Thread({ readLoop(t) }, "dns-tun-reader").also { it.start() }
         return t

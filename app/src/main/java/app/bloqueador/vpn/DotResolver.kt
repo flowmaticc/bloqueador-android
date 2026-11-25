@@ -86,6 +86,11 @@ class DotResolver(
     @Volatile private var serverIndex = 0
     @Volatile private var lastSentAt = 0L
     @Volatile private var waitingSince = 0L
+    @Volatile private var lastCleanup = 0L
+
+    /** Sin red (o sin ningún servidor alcanzable) no se reintenta conectar hasta [retryAt]. */
+    @Volatile private var retryAt = 0L
+    @Volatile private var backoffMs = 0L
 
     override fun start() {
         writer = Executors.newSingleThreadExecutor { Thread(it, "dns-tls") }
@@ -126,7 +131,11 @@ class DotResolver(
     /** En el hilo de escritura: conecta si hace falta y envía la consulta [id]. */
     private fun send(id: Int) {
         val p = pending[id] ?: return
-        val conn = connection ?: connect() ?: return // sin conexión: caducará y el cliente reintenta
+        val conn = connection ?: connect() ?: run {
+            // Sin conexión: SERVFAIL ya (el cliente no espera en vano). Reintentará más tarde.
+            take(id)?.let { p -> reply(IpPacket.buildUdpReply(p.request, DnsMessage.buildErrorResponse(p.request.payload(), DnsMessage.RCODE_SERVFAIL))) }
+            return
+        }
         try {
             synchronized(conn.out) {
                 conn.out.writeShort(p.query.size)
@@ -143,6 +152,27 @@ class DotResolver(
 
     /** Abre la conexión TLS (probando los servidores en orden) y su hilo lector. */
     private fun connect(): Connection? {
+        if (System.currentTimeMillis() < retryAt) return null
+        val conn = tryServers()
+        if (conn != null) {
+            backoffMs = 0L
+            retryAt = 0L
+        } else {
+            // Ningún servidor contesta (sin red, o la red bloquea el puerto 853): se espera cada vez más
+            // antes de volver a probar, para no gastar batería. Un cambio de red lo reinicia.
+            backoffMs = if (backoffMs == 0L) MIN_BACKOFF_MS else minOf(backoffMs * 2, MAX_BACKOFF_MS)
+            retryAt = System.currentTimeMillis() + backoffMs
+            Log.i(TAG, "Ningún servidor TLS disponible: siguiente intento en ${backoffMs / 1000} s")
+        }
+        return conn
+    }
+
+    override fun networkChanged() {
+        backoffMs = 0L
+        retryAt = 0L
+    }
+
+    private fun tryServers(): Connection? {
         repeat(servers.size) {
             val server = servers[Math.floorMod(serverIndex, servers.size)]
             val raw = Socket()
@@ -231,7 +261,9 @@ class DotResolver(
     }
 
     private fun expire(now: Long) {
-        if (pending.size < CLEANUP_THRESHOLD) return
+        // Con muchas en vuelo, o como mucho cada TIMEOUT_MS: las caducadas no se quedan para siempre.
+        if (pending.size < CLEANUP_THRESHOLD && now - lastCleanup < TIMEOUT_MS) return
+        lastCleanup = now
         pending.entries.filter { now - it.value.sentAt > TIMEOUT_MS }.forEach { take(it.key) }
     }
 
@@ -248,6 +280,8 @@ class DotResolver(
         private const val TIMEOUT_MS = 8_000L
         private const val CLEANUP_THRESHOLD = 64
         private const val RECENT_MS = 30_000L
+        internal const val MIN_BACKOFF_MS = 1_000L
+        internal const val MAX_BACKOFF_MS = 15_000L
         private const val MAX_RESPONSE = 65_535
         internal const val MAX_PENDING = 1024
         internal const val MAX_PENDING_PER_APP = 256

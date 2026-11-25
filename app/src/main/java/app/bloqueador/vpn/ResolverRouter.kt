@@ -49,4 +49,9 @@ class ResolverRouter(
     override val inFlight: Int get() = udp.inFlight + (dot?.second?.inFlight ?: 0)
 
     override fun isUnresponsive(now: Long): Boolean = current().isUnresponsive(now)
+
+    override fun networkChanged() {
+        udp.networkChanged()
+        dot?.second?.networkChanged()
+    }
 }

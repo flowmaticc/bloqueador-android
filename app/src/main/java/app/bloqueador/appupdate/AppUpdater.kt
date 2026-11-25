@@ -1,5 +1,6 @@
 package app.bloqueador.appupdate
 
+import app.bloqueador.lists.isHttps
 import app.bloqueador.R
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
@@ -102,16 +103,19 @@ class AppUpdater(private val context: Context, private val repo: String = BuildC
     /** Descarga el APK y verifica su huella. [progress] recibe 0..1. */
     suspend fun download(info: UpdateInfo, progress: (Float) -> Unit): File = withContext(Dispatchers.IO) {
         dir.mkdirs()
-        dir.listFiles()?.forEach { it.delete() } // solo se guarda la última descarga
         val file = File(dir, "bloqueador-${info.versionCode}.apk")
+        // Se descarga aparte y solo se sustituye lo anterior cuando la nueva pasa todas las comprobaciones.
+        val tmp = File(dir, "descarga-${info.versionCode}.tmp.apk").also { it.delete() }
         val conn = open(requireTrusted(info.apkUrl))
+        var ok = false
         try {
             if (conn.responseCode != 200) throw IOException("HTTP ${conn.responseCode}")
+            requireHttpsAfterRedirects(conn)
             val total = conn.contentLengthLong.takeIf { it > 0 }
             if (total != null && total > MAX_APK_BYTES) throw IOException(context.getString(R.string.upd_err_too_big))
             val digest = MessageDigest.getInstance("SHA-256")
             conn.inputStream.use { input ->
-                file.outputStream().use { out ->
+                tmp.outputStream().use { out ->
                     val buf = ByteArray(64 * 1024)
                     var read = 0L
                     while (true) {
@@ -126,17 +130,15 @@ class AppUpdater(private val context: Context, private val repo: String = BuildC
                 }
             }
             val sha = digest.digest().joinToString("") { "%02x".format(it) }
-            if (sha != info.sha256) {
-                file.delete()
-                throw IOException(context.getString(R.string.upd_err_hash))
-            }
-            if (!signedLikeThisApp(file)) {
-                file.delete()
-                throw IOException(context.getString(R.string.upd_err_signature))
-            }
+            if (sha != info.sha256) throw IOException(context.getString(R.string.upd_err_hash))
+            if (!signedLikeThisApp(tmp)) throw IOException(context.getString(R.string.upd_err_signature))
+            dir.listFiles()?.filter { it != tmp }?.forEach { it.delete() } // solo se guarda la última descarga
+            if (!tmp.renameTo(file)) throw IOException("no se pudo guardar la descarga")
+            ok = true
             file
         } finally {
             conn.disconnect()
+            if (!ok) tmp.delete()
         }
     }
 
@@ -219,10 +221,18 @@ class AppUpdater(private val context: Context, private val repo: String = BuildC
             setRequestProperty("Accept", "application/vnd.github+json, application/octet-stream")
         }
 
+    /** Tras seguir redirecciones la dirección final tiene que seguir siendo HTTPS (salvo pruebas locales). */
+    private fun requireHttpsAfterRedirects(conn: HttpURLConnection) {
+        val url = conn.url
+        if (BuildConfig.DEBUG && url.host == "127.0.0.1") return
+        if (!isHttps(url)) throw IOException(context.getString(R.string.upd_err_url))
+    }
+
     private fun get(url: String): String {
         val conn = open(url)
         try {
             if (conn.responseCode != 200) throw HttpStatus(conn.responseCode)
+            requireHttpsAfterRedirects(conn)
             return conn.inputStream.use { readLimited(it, MAX_JSON_BYTES) }.toString(Charsets.UTF_8)
         } finally {
             conn.disconnect()

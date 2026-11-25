@@ -26,13 +26,18 @@ object DnsMessage {
     private const val HEADER_SIZE = 12
     private const val MAX_NAME_LENGTH = 253
 
-    /** Devuelve la primera pregunta si [data] es una consulta estándar válida; si no, null. */
+    /**
+     * Devuelve la pregunta si [data] es una consulta estándar válida; si no, null.
+     * Solo se admite **una** pregunta (QDCOUNT = 1, lo que exige RFC 9619 y envían todas las apps): con
+     * varias, el filtro solo vería la primera y las demás se reenviarían sin filtrar.
+     */
     fun parseQuery(data: ByteArray, offset: Int = 0, length: Int = data.size - offset): DnsQuestion? {
         if (offset < 0 || length < HEADER_SIZE + 5 || offset + length > data.size) return null
         val flags = u16(data, offset + 2)
         val isResponse = flags and 0x8000 != 0
         val opcode = (flags shr 11) and 0xF
         if (isResponse || opcode != 0) return null
+        if (u16(data, offset + 4) != 1) return null // QDCOUNT
         return parseQuestion(data, offset, length)
     }
 

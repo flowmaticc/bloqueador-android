@@ -59,10 +59,21 @@ class UpstreamDns(context: Context) {
 
     @Volatile
     private var logged: String? = null
+    @Volatile
+    private var lastChosen: Network? = null
+
+    /** Se llama cuando cambia la red de salida (no solo sus DNS). */
+    @Volatile
+    var onNetworkChanged: (() -> Unit)? = null
 
     /** Registro interno (logcat) de la red elegida y sus DNS, solo cuando cambian. */
     private fun logIfChanged() {
-        val line = "red=${tracker.network} dns=${tracker.dns().map { it.hostAddress }}"
+        val network = tracker.network
+        if (network != lastChosen) {
+            lastChosen = network
+            if (network != null) onNetworkChanged?.invoke()
+        }
+        val line = "red=$network dns=${tracker.dns().map { it.hostAddress }}"
         if (line != logged) {
             logged = line
             Log.i(TAG, "Red de salida: $line")

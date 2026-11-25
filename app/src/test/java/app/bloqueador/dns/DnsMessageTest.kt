@@ -113,4 +113,16 @@ class DnsMessageTest {
         assertEquals(question.end, r.size)
         assertNotNull(DnsMessage.parseQuery(q))
     }
+
+    @Test
+    fun `una consulta con varias preguntas se rechaza (la segunda no se filtraria)`() {
+        val one = app.bloqueador.vpn.DnsForwarderTest.dnsQuery("permitido.example", 1)
+        val second = app.bloqueador.vpn.DnsForwarderTest.dnsQuery("doubleclick.net", 1).copyOfRange(12, 12 + 17 + 4)
+        val two = one + second
+        DnsMessage.put16(two, 4, 2)
+        org.junit.Assert.assertNull(DnsMessage.parseQuery(two))
+        DnsMessage.put16(two, 4, 0)
+        org.junit.Assert.assertNull(DnsMessage.parseQuery(two))
+        org.junit.Assert.assertEquals("permitido.example", DnsMessage.parseQuery(one)?.name)
+    }
 }

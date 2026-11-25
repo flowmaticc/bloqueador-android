@@ -258,7 +258,11 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
             if (target.isFile) prefs.getString(etagKey, null)?.let { setRequestProperty("If-None-Match", it) }
         }
         try {
-            when (val code = conn.responseCode) {
+            val code = conn.responseCode
+            // Tras las redirecciones la dirección final tiene que seguir siendo HTTPS: una lista bajada
+            // sin cifrar podría venir manipulada (p. ej. sin bloquear un dominio de malware).
+            if (!isHttps(conn.url)) throw IOException(appContext.getString(R.string.upd_err_url))
+            when (code) {
                 HttpURLConnection.HTTP_NOT_MODIFIED -> {
                     prefs.edit().putLong(updatedKey, System.currentTimeMillis()).apply()
                     false
@@ -282,7 +286,11 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
                     }
                     val newCount = tmp.bufferedReader().useLines { BlocklistParser.parse(it).ruleCount }
                     val oldCount = prefs.getInt(countKey, 0)
-                    if (newCount < MIN_RULES || newCount < oldCount / 2) {
+                    val rejectedKey = "rejected_${source.id}"
+                    val declared = ListSizeCheck.declaredEntries(tmp)
+                    if (!ListSizeCheck.accept(newCount, oldCount, declared, prefs.getInt(rejectedKey, 0))) {
+                        // Se recuerda: si la próxima descarga trae lo mismo, la bajada era intencionada.
+                        prefs.edit().putInt(rejectedKey, newCount).apply()
                         throw IOException(appContext.getString(R.string.list_err_discarded, source.name(), newCount, oldCount))
                     }
                     // Nunca se borra la lista vigente antes de tener la nueva en su sitio.
@@ -294,6 +302,7 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
                     prefs.edit()
                         .putString(etagKey, conn.getHeaderField("ETag"))
                         .putInt(countKey, newCount)
+                        .remove("rejected_${source.id}")
                         .putLong(updatedKey, System.currentTimeMillis())
                         .apply()
                     true
@@ -307,10 +316,12 @@ class BlocklistRepository(context: Context, private val settings: AppSettings) {
     }
 
     private companion object {
-        const val MIN_RULES = 100
         const val MAX_LIST_BYTES = 120L * 1024 * 1024
         const val KEY_LAST_CHECK = "last_check"
         const val KEY_FAILURES = "consecutive_failures"
         const val KEY_LAST_ERROR = "last_error"
     }
 }
+
+/** ¿Es HTTPS? (la dirección final de una descarga, después de seguir las redirecciones). */
+internal fun isHttps(url: URL): Boolean = url.protocol.equals("https", ignoreCase = true)
