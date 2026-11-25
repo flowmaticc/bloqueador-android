@@ -40,21 +40,55 @@ object IpPacket {
         if ((d[9].toInt() and 0xFF) != PROTO_UDP) return null
         val fragment = DnsMessage.u16(d, 6)
         if (fragment and 0x3FFF != 0) return null // fragmentado (MF o offset): DNS no lo usa
+        if (checksum(0, d, 0, ihl) != 0) return null // cabecera IPv4 dañada
         val total = minOf(DnsMessage.u16(d, 2), length)
         return udp(4, d, d.copyOfRange(12, 16), d.copyOfRange(16, 20), ihl, total)
     }
 
     private fun parseV6(d: ByteArray, length: Int): UdpPacket? {
         if (length < IPV6_HEADER + UDP_HEADER) return null
-        if ((d[6].toInt() and 0xFF) != PROTO_UDP) return null // no seguimos cabeceras de extensión
         val total = minOf(IPV6_HEADER + DnsMessage.u16(d, 4), length)
-        return udp(6, d, d.copyOfRange(8, 24), d.copyOfRange(24, 40), IPV6_HEADER, total)
+        val (proto, start) = v6Transport(d, total) ?: return null
+        if (proto != PROTO_UDP) return null
+        return udp(6, d, d.copyOfRange(8, 24), d.copyOfRange(24, 40), start, total)
+    }
+
+    /**
+     * Protocolo y comienzo de los datos de transporte de un paquete IPv6, saltando las cabeceras de
+     * extensión habituales (salto a salto, enrutamiento y opciones de destino). null si está
+     * fragmentado, si usa otra cabecera desconocida o si no cabe.
+     */
+    private fun v6Transport(d: ByteArray, ipEnd: Int): Pair<Int, Int>? {
+        var next = d[6].toInt() and 0xFF
+        var pos = IPV6_HEADER
+        repeat(8) { // como mucho 8 cabeceras encadenadas
+            when (next) {
+                0, 43, 60 -> { // Hop-by-Hop, Routing, Destination Options: (longitud + 1) * 8 bytes
+                    if (pos + 2 > ipEnd) return null
+                    val len = ((d[pos + 1].toInt() and 0xFF) + 1) * 8
+                    next = d[pos].toInt() and 0xFF
+                    pos += len
+                    if (pos > ipEnd) return null
+                }
+                44 -> return null // fragmento: el DNS no lo usa
+                else -> return next to pos
+            }
+        }
+        return null
     }
 
     private fun udp(v: Int, d: ByteArray, src: ByteArray, dst: ByteArray, udpStart: Int, ipEnd: Int): UdpPacket? {
         if (ipEnd < udpStart + UDP_HEADER) return null
         val udpLen = DnsMessage.u16(d, udpStart + 4)
         if (udpLen < UDP_HEADER || udpStart + udpLen > ipEnd) return null
+        // Suma de comprobación UDP: en IPv4 un 0 significa "sin suma"; en IPv6 es obligatoria.
+        val sent = DnsMessage.u16(d, udpStart + 6)
+        if (sent != 0 || v == 6) {
+            var sum = sumWords(0, src, 0, src.size)
+            sum = sumWords(sum, dst, 0, dst.size)
+            sum += PROTO_UDP + udpLen
+            if (checksum(sum, d, udpStart, udpLen) != 0) return null
+        }
         return UdpPacket(
             ipVersion = v,
             source = src,
@@ -144,9 +178,11 @@ object IpPacket {
                 ipEnd = minOf(DnsMessage.u16(data, 2), length)
             }
             6 -> {
-                ipHeader = IPV6_HEADER
-                if (length < IPV6_HEADER || (data[6].toInt() and 0xFF) != PROTO_TCP) return null
+                if (length < IPV6_HEADER) return null
                 ipEnd = minOf(IPV6_HEADER + DnsMessage.u16(data, 4), length)
+                val (proto, start) = v6Transport(data, ipEnd) ?: return null
+                if (proto != PROTO_TCP) return null
+                ipHeader = start
             }
             else -> return null
         }
