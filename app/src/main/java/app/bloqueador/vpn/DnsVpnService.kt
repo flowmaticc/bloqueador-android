@@ -12,6 +12,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
 import android.net.VpnService
 import android.os.Build
 import android.os.ParcelFileDescriptor
@@ -94,6 +98,21 @@ class DnsVpnService : VpnService() {
     private var appResolver: AppResolver? = null
     @Volatile
     private var threatAlerts: ThreatAlerts? = null
+
+    /**
+     * Vigila el ajuste "DNS privado" de Android: con un proveedor fijo no se capturan los DNS públicos
+     * (ver buildTunnel), así que al cambiarlo se rehace el túnel.
+     */
+    private val privateDnsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+        override fun onChange(selfChange: Boolean) {
+            if (tunnel != null && privateDnsFixed() != tunnelSkipsPublicDns) reloadTunnel()
+        }
+    }
+    @Volatile private var tunnelSkipsPublicDns = false
+
+    /** ¿Tiene Android un proveedor de DNS privado fijo (DNS sobre TLS a un nombre concreto)? */
+    private fun privateDnsFixed(): Boolean =
+        Build.VERSION.SDK_INT >= 28 && Settings.Global.getString(contentResolver, "private_dns_mode") == "hostname"
 
     /** true mientras se cargan las listas antes de abrir el túnel: evita un segundo arranque en paralelo. */
     @Volatile
@@ -209,6 +228,11 @@ class DnsVpnService : VpnService() {
             return
         }
         tunnel = opened
+        if (Build.VERSION.SDK_INT >= 28) {
+            runCatching {
+                contentResolver.registerContentObserver(Settings.Global.getUriFor("private_dns_mode"), false, privateDnsObserver)
+            }
+        }
         loadBlocklist()
     }
 
@@ -260,8 +284,16 @@ class DnsVpnService : VpnService() {
                     this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
                 )
             )
+        // DNS públicos conocidos: así las apps que preguntan a 8.8.8.8 o 1.1.1.1 por su cuenta también
+        // pasan por el filtro (ver PublicDns). No con un DNS privado fijo: Android mandaría su DNS
+        // cifrado a esas direcciones, el túnel lo cortaría y el móvil se quedaría sin resolver nada.
+        // En ese caso el filtro no tiene efecto de todos modos, y la pantalla principal ya lo avisa.
+        val capturePublic = !privateDnsFixed()
+        tunnelSkipsPublicDns = !capturePublic
+        if (capturePublic) PublicDns.V4.forEach { runCatching { builder.addRoute(it, 32) } }
         try {
             builder.addAddress(TUN_V6, 64).addDnsServer(DNS_V6).addRoute(DNS_V6, 128)
+            if (capturePublic) PublicDns.V6.forEach { runCatching { builder.addRoute(it, 128) } }
         } catch (e: IllegalArgumentException) {
             Log.w(TAG, "IPv6 no disponible en el túnel", e)
         }
@@ -367,7 +399,12 @@ class DnsVpnService : VpnService() {
     }
 
     private fun handlePacket(buffer: ByteArray, length: Int) {
-        val udp = IpPacket.parseUdp(buffer, length) ?: return
+        val udp = IpPacket.parseUdp(buffer, length) ?: run {
+            // TCP al DNS del túnel o a un DNS público (DNS por TCP, DoT, DoH): RST, para que la app no
+            // espere y use el DNS del sistema por UDP, que es el que se filtra.
+            IpPacket.buildTcpReset(buffer, length)?.let(::write)
+            return
+        }
         if (udp.destinationPort != 53) return
         val question = DnsMessage.parseQuery(udp.data, udp.payloadOffset, udp.payloadLength) ?: return
         checkLockdownNow()
@@ -422,6 +459,7 @@ class DnsVpnService : VpnService() {
     }
 
     private fun closeAll() {
+        runCatching { contentResolver.unregisterContentObserver(privateDnsObserver) }
         starting = false
         generation++
         app.dnsUnresponsive = null

@@ -17,6 +17,8 @@ class UdpPacket(
 /** Lectura y construcción de paquetes IPv4/IPv6 + UDP para la interfaz tun. */
 object IpPacket {
     private const val PROTO_UDP = 17
+    private const val PROTO_TCP = 6
+    private const val TCP_HEADER = 20
     private const val IPV4_HEADER = 20
     private const val IPV6_HEADER = 40
     private const val UDP_HEADER = 8
@@ -120,6 +122,87 @@ object IpPacket {
         if (udpChecksum == 0) udpChecksum = 0xFFFF
         DnsMessage.put16(out, u + 6, udpChecksum)
         return out
+    }
+
+    /**
+     * Si [data] es un segmento TCP, el RST que lo rechaza (direcciones y puertos intercambiados), para
+     * que quien conecta falle al momento en lugar de esperar. null si no es TCP o ya es un RST.
+     * RFC 9293 §3.10.7.1: si el segmento trae ACK, el RST lleva seq = su ACK; si no, seq = 0 y
+     * ACK = su seq + longitud (SYN y FIN cuentan 1).
+     */
+    fun buildTcpReset(data: ByteArray, length: Int): ByteArray? {
+        if (length < 1) return null
+        val v = (data[0].toInt() and 0xFF) shr 4
+        val ipHeader: Int
+        val ipEnd: Int
+        when (v) {
+            4 -> {
+                if (length < IPV4_HEADER) return null
+                ipHeader = (data[0].toInt() and 0x0F) * 4
+                if (ipHeader < IPV4_HEADER || (data[9].toInt() and 0xFF) != PROTO_TCP) return null
+                if (DnsMessage.u16(data, 6) and 0x1FFF != 0) return null // fragmento sin cabecera TCP
+                ipEnd = minOf(DnsMessage.u16(data, 2), length)
+            }
+            6 -> {
+                ipHeader = IPV6_HEADER
+                if (length < IPV6_HEADER || (data[6].toInt() and 0xFF) != PROTO_TCP) return null
+                ipEnd = minOf(IPV6_HEADER + DnsMessage.u16(data, 4), length)
+            }
+            else -> return null
+        }
+        if (ipEnd < ipHeader + TCP_HEADER) return null
+        val t = ipHeader
+        val flags = data[t + 13].toInt() and 0xFF
+        if (flags and 0x04 != 0) return null // a un RST no se responde
+        val dataOffset = ((data[t + 12].toInt() and 0xFF) shr 4) * 4
+        if (dataOffset < TCP_HEADER || t + dataOffset > ipEnd) return null
+        val segLen = (ipEnd - t - dataOffset) + (if (flags and 0x02 != 0) 1 else 0) + (if (flags and 0x01 != 0) 1 else 0)
+        val hasAck = flags and 0x10 != 0
+        val seq = if (hasAck) u32(data, t + 8) else 0L
+        val ack = if (hasAck) 0L else (u32(data, t + 4) + segLen) and 0xFFFFFFFFL
+        val outFlags = if (hasAck) 0x04 else 0x14 // RST, o RST+ACK
+
+        val src = if (v == 4) data.copyOfRange(16, 20) else data.copyOfRange(24, 40) // su destino
+        val dst = if (v == 4) data.copyOfRange(12, 16) else data.copyOfRange(8, 24)  // su origen
+        val headerLen = if (v == 4) IPV4_HEADER else IPV6_HEADER
+        val out = ByteArray(headerLen + TCP_HEADER)
+        if (v == 4) {
+            out[0] = 0x45
+            DnsMessage.put16(out, 2, out.size)
+            out[6] = 0x40
+            out[8] = 64
+            out[9] = PROTO_TCP.toByte()
+            System.arraycopy(src, 0, out, 12, 4)
+            System.arraycopy(dst, 0, out, 16, 4)
+            DnsMessage.put16(out, 10, checksum(0, out, 0, IPV4_HEADER))
+        } else {
+            out[0] = 0x60
+            DnsMessage.put16(out, 4, TCP_HEADER)
+            out[6] = PROTO_TCP.toByte()
+            out[7] = 64
+            System.arraycopy(src, 0, out, 8, 16)
+            System.arraycopy(dst, 0, out, 24, 16)
+        }
+        val o = headerLen
+        DnsMessage.put16(out, o, DnsMessage.u16(data, t + 2))     // puerto origen = su destino
+        DnsMessage.put16(out, o + 2, DnsMessage.u16(data, t))     // puerto destino = su origen
+        put32(out, o + 4, seq)
+        put32(out, o + 8, ack)
+        out[o + 12] = (5 shl 4).toByte()
+        out[o + 13] = outFlags.toByte()
+        var sum = sumWords(0, src, 0, src.size)
+        sum = sumWords(sum, dst, 0, dst.size)
+        sum += PROTO_TCP + TCP_HEADER
+        DnsMessage.put16(out, o + 16, checksum(sum, out, o, TCP_HEADER))
+        return out
+    }
+
+    private fun u32(d: ByteArray, i: Int): Long =
+        (DnsMessage.u16(d, i).toLong() shl 16) or DnsMessage.u16(d, i + 2).toLong()
+
+    private fun put32(d: ByteArray, i: Int, value: Long) {
+        DnsMessage.put16(d, i, ((value ushr 16) and 0xFFFF).toInt())
+        DnsMessage.put16(d, i + 2, (value and 0xFFFF).toInt())
     }
 
     /** Suma de comprobación de Internet (RFC 1071) partiendo de una suma previa [initial]. */

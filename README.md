@@ -41,6 +41,14 @@ Lo que **no** puede quitar ningún bloqueador de este tipo: los anuncios de YouT
 publicaciones promocionadas de las redes sociales (llegan por los mismos servidores que el contenido).
 Para los huecos de anuncios dentro de las webs, combínalo con Brave o Firefox + uBlock Origin.
 
+**Apps que se saltan el DNS del móvil.** Algunas apps preguntan directamente a un DNS público en lugar
+de usar el del sistema. Garbillo también filtra las consultas a los más conocidos (Google, Cloudflare,
+Quad9, OpenDNS, AdGuard, CleanBrowsing, Control D y Mullvad) y corta su DNS cifrado, así que Chrome,
+Firefox y la mayoría de apps vuelven al DNS del sistema, que sí se filtra. Una app que use un servidor
+DNS propio poco conocido, o DNS cifrado hacia otras direcciones, sí puede saltarse el filtro: evitarlo
+obligaría a pasar todo el tráfico por la VPN, y Garbillo no lo hace a propósito (gastaría más batería
+y vería todo lo que haces, no solo los nombres de dominio).
+
 ## Instalar
 
 1. Descarga `bloqueador-X.Y.Z.apk` de la [última versión estable](https://github.com/flowmaticc/bloqueador-android/releases/latest).
