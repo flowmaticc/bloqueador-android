@@ -111,17 +111,6 @@
         <item quantity="one">Solo %d app</item>
         <item quantity="other">Solo %d apps</item>
     </plurals>
-    <string name="no_internet_title">Apps sin internet</string>
-    <string name="no_internet_none">Ninguna app bloqueada</string>
-    <plurals name="no_internet_count">
-        <item quantity="one">%d app sin internet</item>
-        <item quantity="other">%d apps sin internet</item>
-    </plurals>
-    <string name="no_internet_help">Garbillo no responde a sus consultas DNS, así que la gran mayoría se quedan sin conexión. Una app que se conecte directamente a una dirección IP podría seguir teniendo internet.</string>
-    <string name="no_internet_old_android">Necesita Android 10 o superior.</string>
-    <string name="no_internet_choose">Elegir apps</string>
-    <string name="no_internet_picker_text">Marca las apps que no deben conectarse a internet mientras Garbillo esté activo. Pasan siempre por el filtro, aunque las hayas excluido.</string>
-    <string name="no_internet_banking_note">Si las dejas sin internet, dejarán de funcionar.</string>
     <string name="time_just_now">hace un momento</string>
     <string name="mode_custom">Personalizado (base %1$s)</string>
     <string name="settings_applied">Configuración aplicada</string>
@@ -520,7 +509,6 @@
     <string name="diag_lockdown_on">\"Bloquear conexiones sin VPN\" está activado ⚠</string>
     <string name="diag_lockdown_off">\"Bloquear conexiones sin VPN\": desactivado ✓</string>
     <string name="diag_apps">Apps filtradas: %1$s</string>
-    <string name="diag_no_internet">Apps sin internet: %1$d</string>
     <string name="diag_public_on">Las consultas a DNS públicos (Google, Cloudflare…) también se filtran ✓</string>
     <string name="diag_public_off">Las consultas a DNS públicos no se capturan (DNS privado fijo)</string>
     <string name="diag_test">Prueba en vivo</string>

@@ -137,9 +137,6 @@ class DnsVpnService : VpnService() {
         }
     }
 
-    /** Apps sin internet (copia de los ajustes al crear el túnel; se lee en cada consulta). */
-    @Volatile private var noInternetApps: Set<String> = emptySet()
-
     /** ¿Tiene Android un proveedor de DNS privado fijo (DNS sobre TLS a un nombre concreto)? */
     private fun privateDnsFixed(): Boolean =
         Build.VERSION.SDK_INT >= 28 && Settings.Global.getString(contentResolver, "private_dns_mode") == "hostname"
@@ -223,7 +220,6 @@ class DnsVpnService : VpnService() {
                 encryptedProvider = app.settings.encryptedDns?.hostname,
                 lastAnswerAt = lastAnswer,
                 publicDnsCaptured = tunnel != null && !tunnelSkipsPublicDns,
-                noInternetApps = noInternetApps.size,
             )
         }
         app.selfTest = ::selfTest
@@ -347,7 +343,6 @@ class DnsVpnService : VpnService() {
             strategy = settings.strategy,
             excluded = settings.excludedApps,
             included = settings.includedApps,
-            noInternet = settings.noInternetApps.also { noInternetApps = it },
             self = packageName,
             isInstalled = { InstalledApps.isInstalled(this, it) },
         )
@@ -455,13 +450,6 @@ class DnsVpnService : VpnService() {
 
         // Averiguar la app es una llamada al sistema: se hace como mucho una vez por consulta.
         val owner = lazy(LazyThreadSafetyMode.NONE) { ownerOf(udp) }
-        val blockedApps = noInternetApps
-        if (blockedApps.isNotEmpty() && owner.value in blockedApps) {
-            // App sin internet: "no existe" para todo, sin reenviar ni contar en las estadísticas.
-            val query = udp.data.copyOfRange(udp.payloadOffset, udp.payloadOffset + udp.payloadLength)
-            write(IpPacket.buildUdpReply(udp, DnsMessage.buildErrorResponse(query, DnsMessage.RCODE_NXDOMAIN)))
-            return
-        }
         val rule = app.engine.decide(question.name)
         if (BuildConfig.DEBUG) QueryLog.query(owner.value, question.name, rule)
         // Nombres con caracteres raros (no son hosts reales): se filtran igual, pero no se anotan ni

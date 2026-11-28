@@ -35,6 +35,8 @@ class AppSettings(context: Context) {
             if (prefs.contains("layers")) edit.putStringSet("layers", stringSet("layers") + ExtraLayers.DEFAULT_LAYER)
             edit.apply()
         }
+        // "Apps sin internet" (beta 0.5.0) se quitó: no funcionaba con todas las apps.
+        if (prefs.contains("no_internet_apps")) prefs.edit().remove("no_internet_apps").apply()
     }
 
     /** Capas activadas de serie: anti-evasión y, si existe, la lista del fabricante. */
@@ -58,14 +60,6 @@ class AppSettings(context: Context) {
     var includedApps: Set<String>
         get() = stringSet("included_apps")
         set(v) = prefs.edit().putStringSet("included_apps", v).apply()
-
-    /**
-     * Apps que no deben tener internet: Garbillo no responde a sus consultas DNS (Android 10+, que es
-     * cuando se puede saber qué app pregunta). Siempre pasan por el túnel, sea cual sea la estrategia.
-     */
-    var noInternetApps: Set<String>
-        get() = stringSet("no_internet_apps")
-        set(v) = prefs.edit().putStringSet("no_internet_apps", v).apply()
 
     var mode: BlockMode
         get() = BlockMode.entries.firstOrNull { it.name == prefs.getString("mode", null) } ?: BlockMode.BALANCED

@@ -117,17 +117,6 @@
         <item quantity="one">Only %d app</item>
         <item quantity="other">Only %d apps</item>
     </plurals>
-    <string name="no_internet_title">Apps without internet</string>
-    <string name="no_internet_none">No apps blocked</string>
-    <plurals name="no_internet_count">
-        <item quantity="one">%d app without internet</item>
-        <item quantity="other">%d apps without internet</item>
-    </plurals>
-    <string name="no_internet_help">Garbillo does not answer their DNS queries, so almost all of them lose their connection. An app that connects straight to an IP address could still have internet.</string>
-    <string name="no_internet_old_android">Requires Android 10 or later.</string>
-    <string name="no_internet_choose">Choose apps</string>
-    <string name="no_internet_picker_text">Check the apps that must not connect to the internet while Garbillo is on. They always go through the filter, even if you excluded them.</string>
-    <string name="no_internet_banking_note">If you cut off their internet, they will stop working.</string>
     <string name="time_just_now">just now</string>
     <string name="mode_custom">Custom (based on %1$s)</string>
     <string name="settings_applied">Settings applied</string>
@@ -527,7 +516,6 @@
     <string name="diag_lockdown_on">\"Block connections without VPN\" is on ⚠</string>
     <string name="diag_lockdown_off">\"Block connections without VPN\": off ✓</string>
     <string name="diag_apps">Filtered apps: %1$s</string>
-    <string name="diag_no_internet">Apps without internet: %1$d</string>
     <string name="diag_public_on">Queries to public DNS servers (Google, Cloudflare…) are filtered too ✓</string>
     <string name="diag_public_off">Queries to public DNS servers are not captured (fixed private DNS)</string>
     <string name="diag_test">Live test</string>

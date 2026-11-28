@@ -16,8 +16,6 @@ data class DiagnosticsInfo(
     val lastAnswerAt: Long,
     /** ¿Captura el túnel los DNS públicos conocidos? (no con DNS privado fijo). */
     val publicDnsCaptured: Boolean,
-    /** Apps sin internet activas en el túnel actual. */
-    val noInternetApps: Int,
 )
 
 enum class NetworkKind { WIFI, CELLULAR, ETHERNET, OTHER }

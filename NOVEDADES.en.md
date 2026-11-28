@@ -8,8 +8,6 @@
 - **Diagnostics** (Settings → Diagnostics): shows whether the filter really works (queries handled,
   lists loaded, which DNS is in use and which network it goes out through) and has a live test that
   checks that a normal site resolves and an ad domain is blocked.
-- **Apps without internet** (Settings → Protected apps): choose apps that must not connect. Garbillo
-  does not answer their queries, so almost all of them lose their connection (Android 10 or later).
 - **Harder to bypass**: apps that ask public DNS servers directly (Google, Cloudflare, Quad9…) also go
   through the filter, and their encrypted DNS is cut so they use the phone's DNS.
 - **More reliable lists**: a failed update never deletes the previous list, and when the author shrinks

@@ -113,7 +113,6 @@ internal fun DiagnosticsSection() {
         Text(if (fixedDns != null) stringResource(R.string.diag_private_dns_fixed, fixedDns) else stringResource(R.string.diag_private_dns_ok))
         Text(stringResource(if (app.settings.vpnLockdown) R.string.diag_lockdown_on else R.string.diag_lockdown_off))
         Text(stringResource(R.string.diag_apps, strategySummary(context, app.settings)))
-        Text(stringResource(R.string.diag_no_internet, app.settings.noInternetApps.size))
         if (info != null) Text(stringResource(if (info.publicDnsCaptured) R.string.diag_public_on else R.string.diag_public_off))
     }
 
